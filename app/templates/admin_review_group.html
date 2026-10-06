@@ -1,0 +1,206 @@
+{% extends 'admin_base.html' %}
+
+{% block title %}{{ 'Modifier' if mode == 'edit' else 'Validation' }} : {{ group.names_display }}{% endblock %}
+
+{# Choix exclusif (oui / non / inconnu, sexe...) sous forme de boutons segmentés #}
+{% macro seg(name, choices, current, error=None) %}
+  <div class="seg-group">
+    {% for value, label in choices %}
+    <label class="seg-option">
+      <input type="radio" name="{{ name }}" value="{{ value }}" {{ 'checked' if current == value }}>
+      <span>{{ label }}</span>
+    </label>
+    {% endfor %}
+  </div>
+  {% if error %}<p class="field-error">{{ error }}</p>{% endif %}
+{% endmacro %}
+
+{% block content %}
+{% set editing = mode == 'edit' %}
+{% if editing %}
+<a href="{{ url_for('admin_listings') }}" class="admin-back">← Toutes les annonces</a>
+{% else %}
+<a href="{{ url_for('admin_review_list') }}" class="admin-back">← Annonces à valider</a>
+{% endif %}
+<div class="admin-title-row">
+  <h1>{{ 'Modifier : ' if editing }}{{ group.names_display }}</h1>
+  <span class="admin-count">{{ group.size }} chat{{ 's' if group.size > 1 else '' }}</span>
+</div>
+<p class="admin-subtitle">
+  Créée {% if group.creators_display %}par <strong>{{ group.creators_display }}</strong> {% endif %}le {{ group.created_at.strftime('%d/%m/%Y') }}.
+  {% if editing %}
+  Annonce publiée : les modifications enregistrées sont visibles immédiatement sur le site.
+  <a href="{{ url_for('cat_detail', uuid=group.main_cat.uuid) }}">Voir l'annonce</a>
+  {% else %}
+  Relisez et corrigez si besoin, puis validez pour publier l'annonce sur le site.
+  {% endif %}
+</p>
+
+{% if saved %}
+<div class="admin-notice success">✓ Modifications enregistrées. {{ "L'annonce est à jour sur le site." if editing else "L'annonce n'est pas encore publiée." }}</div>
+{% endif %}
+{% if photo_errors %}
+<div class="admin-notice error">⚠ {{ photo_errors }} fichier{{ 's' if photo_errors > 1 }} photo n'{{ 'ont' if photo_errors > 1 else 'a' }} pas pu être supprimé{{ 's' if photo_errors > 1 }} du serveur (voir les logs). Les fiches sont bien à jour.</div>
+{% endif %}
+{% if errors %}
+<div class="admin-notice error">Certains champs sont à corriger (voir ci-dessous). Rien n'a été enregistré.</div>
+{% endif %}
+{% if differences %}
+<div class="admin-notice warning">
+  Les chats de cette annonce n'ont pas les mêmes valeurs pour : <strong>{{ differences|join(', ') }}</strong>.
+  Les valeurs de {{ cats[0].name }} sont proposées ; à l'enregistrement, elles s'appliqueront à tous les chats.
+</div>
+{% endif %}
+{% if published_cats %}
+<div class="admin-notice">
+  Déjà publié et non modifié ici : {{ published_cats|map(attribute='name')|join(', ') }}.
+</div>
+{% endif %}
+
+<form method="POST" class="review-form" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <!-- Champs communs -->
+  <section class="info-card form-card">
+    <h2>{{ 'Commun aux ' ~ cats|length ~ ' chats' if cats|length > 1 else "L'annonce" }}</h2>
+    {% if cats|length > 1 %}
+    <p class="form-hint">Ces chats rejoindront le même foyer : entente, accès extérieur, description et photos sont partagés.</p>
+    {% endif %}
+
+    <div class="form-grid">
+      {% for field, label, choices in form.COMMON_BOOL %}
+      <div class="form-field">
+        <span class="form-label">{{ label }}</span>
+        {{ seg(field, choices, common[field], errors.get(field)) }}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="description">Description</label>
+      <textarea id="description" name="description" rows="7" class="form-input" required>{{ common.description }}</textarea>
+      {% if errors.description %}<p class="field-error">{{ errors.description }}</p>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <span class="form-label">Photos</span>
+      {% if available_photos %}
+      <input type="hidden" name="photo_main" id="photoMain" value="{{ available_photos[0] }}">
+      <div class="photo-pick-grid" id="photoGrid">
+        {% for photo in available_photos %}
+        {% set marked = photo in common.photos_delete %}
+        <div class="photo-pick {{ 'is-deleted' if marked }} {{ 'is-main' if loop.first }}" data-photo="{{ photo }}">
+          <img src="{{ photo|photo_url }}" alt="Photo {{ loop.index }}" title="Définir comme photo principale">
+          <span class="photo-pick-main">Principale</span>
+          <button type="button" class="photo-pick-delete" title="Supprimer cette photo" aria-label="Supprimer la photo {{ loop.index }}">✕</button>
+          <div class="photo-pick-overlay">
+            <span>Sera supprimée</span>
+            <button type="button" class="photo-pick-undo">Annuler</button>
+          </div>
+          <input type="hidden" name="photos_delete" value="{{ photo }}" {{ 'disabled' if not marked }}>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="form-hint photo-pick-hint">
+        Cliquez sur une photo pour en faire la photo principale (affichée en premier sur le site).
+        Les photos marquées ✕ seront définitivement supprimées (fichier effacé du serveur) à l'enregistrement ;
+        d'ici là, « Annuler » permet de les garder.
+      </p>
+      {% else %}
+      <p class="form-hint">Aucune photo.</p>
+      {% endif %}
+      {% if errors.photos %}<p class="field-error">{{ errors.photos }}</p>{% endif %}
+    </div>
+  </section>
+
+  <!-- Champs propres à chaque chat -->
+  {% for cat in cats %}
+  {% set p = 'c' ~ cat.id ~ '_' %}
+  {% set v = own[cat.id] %}
+  <section class="info-card form-card">
+    <h2>{{ ('Chat ' ~ loop.index ~ ' : ' ~ (v.name or cat.name)) if cats|length > 1 else 'Le chat' }}</h2>
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="form-label" for="{{ p }}name">Nom</label>
+        <input id="{{ p }}name" name="{{ p }}name" value="{{ v.name }}" maxlength="100" class="form-input">
+        {% if errors.get(p ~ 'name') %}<p class="field-error">{{ errors.get(p ~ 'name') }}</p>{% endif %}
+      </div>
+      <div class="form-field">
+        <span class="form-label">Sexe</span>
+        {{ seg(p ~ 'sex', form.SEX_CHOICES, v.sex, errors.get(p ~ 'sex')) }}
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="{{ p }}birthdate">Date de naissance <span class="form-label-hint">(estimée si inconnue)</span></label>
+        <input id="{{ p }}birthdate" name="{{ p }}birthdate" type="date" value="{{ v.birthdate }}" class="form-input" required>
+        {% if errors.get(p ~ 'birthdate') %}<p class="field-error">{{ errors.get(p ~ 'birthdate') }}</p>{% endif %}
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="{{ p }}breed">Race</label>
+        <input id="{{ p }}breed" name="{{ p }}breed" value="{{ v.breed }}" maxlength="100" class="form-input" placeholder="Européen">
+        {% if errors.get(p ~ 'breed') %}<p class="field-error">{{ errors.get(p ~ 'breed') }}</p>{% endif %}
+      </div>
+      {% for field, label, choices in form.OWN_BOOL %}
+      <div class="form-field">
+        <span class="form-label">{{ label }}</span>
+        {{ seg(p ~ field, choices, v[field], errors.get(p ~ field)) }}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <!-- Actions -->
+  <div class="form-actions">
+    {% if editing %}
+    <a href="{{ url_for('admin_listings') }}" class="btn-dialog-secondary btn-link">Annuler</a>
+    <button type="submit" name="action" value="save" class="btn-dialog-primary">Enregistrer</button>
+    {% else %}
+    <button type="submit" name="action" value="save" class="btn-dialog-secondary">Enregistrer</button>
+    <button type="submit" name="action" value="publish" class="btn-dialog-primary"
+      data-confirm-icon="🐾" data-confirm-title="Publier l'annonce ?" data-confirm-ok="Publier"
+      data-confirm-message="{{ ('Les ' ~ cats|length ~ ' chats (' ~ group.names_display ~ ') seront visibles') if cats|length > 1 else (group.names_display ~ ' sera visible') }} sur le site des adoptions.">
+      Valider et publier
+    </button>
+    {% endif %}
+  </div>
+</form>
+
+<script>
+  (() => {
+    const grid = document.getElementById('photoGrid');
+    const mainInput = document.getElementById('photoMain');
+    if (!grid) return;
+
+    // Photo principale : placée en premier, avec le badge "Principale"
+    function setMain(card) {
+      grid.querySelectorAll('.photo-pick').forEach((c) => c.classList.remove('is-main'));
+      if (!card) { mainInput.value = ''; return; }
+      card.classList.add('is-main');
+      grid.prepend(card);
+      mainInput.value = card.dataset.photo;
+    }
+
+    grid.querySelectorAll('.photo-pick').forEach((card) => {
+      // Clic sur une photo (non marquée pour suppression) : elle devient la principale
+      card.querySelector('img').addEventListener('click', () => {
+        if (!card.classList.contains('is-deleted')) setMain(card);
+      });
+    });
+
+    // Marque / démarque une photo pour suppression (appliquée à l'enregistrement)
+    document.querySelectorAll('.photo-pick-delete, .photo-pick-undo').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.photo-pick');
+        const marked = card.classList.toggle('is-deleted');
+        card.querySelector('input[name="photos_delete"]').disabled = !marked;
+        // La principale est marquée : la première photo conservée prend sa place
+        if (marked && card.classList.contains('is-main')) {
+          setMain(grid.querySelector('.photo-pick:not(.is-deleted)'));
+        } else if (!marked && !mainInput.value) {
+          setMain(card);
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

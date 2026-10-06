@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+
+# Sockets and runtime
+*.sock
+gunicorn.ctl
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Config
+config.py
+config-dev.py

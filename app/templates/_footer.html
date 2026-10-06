@@ -1,0 +1,10 @@
+  <footer>
+    <div>Association Éthique & Respect Animal &bull; Strasbourg et environs</div>
+    <nav class="footer-links" aria-label="Informations légales">
+      <a href="{{ url_for('legal_notice') }}">Mentions légales</a>
+      <a href="{{ url_for('privacy') }}">Confidentialité</a>
+      {% if not current_user.is_authenticated %}
+      <a href="{{ config.ERAFA_URL }}/login/?next={{ request.url|urlencode }}">Espace bénévoles</a>
+      {% endif %}
+    </nav>
+  </footer>

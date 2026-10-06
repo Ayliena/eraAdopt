@@ -1,0 +1,93 @@
+{# Liste des annonces : incluse dans l'accueil, ou renvoyée seule (?partial=1) quand un filtre change #}
+{% from '_macros.html' import sex_icon %}
+{% if cats and cats|length > 0 %}
+<div class="cat-grid">
+  {% for cat in cats %}
+  <article class="cat-card">
+    {% set group = cat.adoption_group %}
+    {% set names = cat.adoption_names_display %}
+    <a href="/chat/{{ cat.uuid }}" class="card-photo-wrapper" tabindex="-1" aria-hidden="true">
+      {% if group|length > 1 %}
+      <span class="badge-multi-adoption">❤️ Adoption multiple ({{ group|length }} chats)</span>
+      {% endif %}
+      {% if cat.primary_photo_url %}
+      <img src="{{ cat.primary_photo_url }}" alt="Photo de {{ names }}" class="card-photo" loading="lazy"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      {% endif %}
+      <div class="card-photo-placeholder"
+        style="{% if cat.primary_photo_url %}display:none;{% else %}display:flex;{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path
+            d="M12 4c-4.4 0-8 3.6-8 8 0 2.2.9 4.2 2.3 5.7L5 20l3.5-1c1.1.6 2.3 1 3.5 1 4.4 0 8-3.6 8-8s-3.6-8-8-8z" />
+          <circle cx="9" cy="11" r="1.5" fill="currentColor" />
+          <circle cx="15" cy="11" r="1.5" fill="currentColor" />
+          <path d="M12 13.5c-.8 0-1.5.5-1.5 1.2 0 .7.7 1.3 1.5 1.3s1.5-.6 1.5-1.3c0-.7-.7-1.2-1.5-1.2z" />
+        </svg>
+        <span>Photo bientôt disponible</span>
+      </div>
+    </a>
+
+    <div class="card-body">
+      <div class="card-title-row">
+        <h2 class="cat-name" title="{{ names }}">{{ names }}</h2>
+        {% if group|length > 1 %}
+        <span class="badge-sex group">
+          {% for count, sex in cat.adoption_sex_counts %}
+          <span class="{{ 'male' if sex == 'MALE' else 'female' }}" title="{{ count }} {{ ('mâle' if sex == 'MALE' else 'femelle') ~ ('s' if count > 1 else '') }}">{{ count }} {{ sex_icon(sex) }}</span>
+          {% endfor %}
+        </span>
+        {% else %}
+        <span class="badge-sex {{ 'male' if cat.sex == 'MALE' else 'female' }}">
+          {{ sex_icon(cat.sex) }} {{ cat.sex_label }}
+        </span>
+        {% endif %}
+      </div>
+
+      <a href="/chat/{{ cat.uuid }}" class="btn-card-details">
+        <span>{{ 'Les découvrir' if group|length > 1 else 'Découvrir ' ~ cat.name }}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </a>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+
+<!-- Barre de Pagination -->
+{% if pagination and pagination.pages > 1 %}
+<div class="pagination-bar">
+  {% if pagination.has_prev %}
+  <a href="{{ url_for('index', page=pagination.prev_num, **applied_filters) }}" class="page-btn">
+    ← Précédent
+  </a>
+  {% endif %}
+
+  <span class="page-info">
+    Page <strong>{{ pagination.page }}</strong> sur <strong>{{ pagination.pages }}</strong> ({{ pagination.total }} annonce{{ 's' if pagination.total > 1 else '' }})
+  </span>
+
+  {% if pagination.has_next %}
+  <a href="{{ url_for('index', page=pagination.next_num, **applied_filters) }}" class="page-btn">
+    Suivant →
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  {% if applied_filters %}
+  <h3>Aucun chat ne correspond à ces critères</h3>
+  <p>Essayez de retirer un critère de recherche.</p>
+  <a href="/" class="btn-primary" data-remove="all">Voir tous les chats</a>
+  {% else %}
+  <h3>Aucun chat répertorié pour le moment</h3>
+  {% if config.DEVEL_SITE %}
+  <p>Mode développement : la base de données est prête. Vous pouvez ajouter les chats tests.</p>
+  <a href="/seed-test" class="btn-primary">Initialiser les chats tests</a>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}

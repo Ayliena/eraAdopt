@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}{% endblock %} - Admin ERA Adoptions</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=static_v('css/style.css')) }}">
+</head>
+<body>
+{% include '_user_bar.html' %}
+
+  <!-- En-tête -->
+  <header class="site-header">
+    <div class="header-container">
+{% include '_brand.html' %}
+      <a href="/" class="back-link">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Retour au site</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    {% block content %}{% endblock %}
+  </main>
+
+{% include '_footer.html' %}
+
+  <!-- Popup de confirmation commune : s'ouvre pour tout formulaire (ou bouton) portant data-confirm-message -->
+  <dialog class="confirm-dialog" id="confirmDialog" aria-labelledby="confirmDialogTitle">
+    <div class="confirm-dialog-body">
+      <span class="confirm-dialog-icon" id="confirmDialogIcon"></span>
+      <h3 id="confirmDialogTitle"></h3>
+      <p id="confirmDialogMessage"></p>
+      <div class="confirm-dialog-actions">
+        <button type="button" class="btn-dialog-secondary" id="confirmDialogBack">Retour</button>
+        <button type="button" class="btn-dialog-primary" id="confirmDialogOk"></button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    // Attributs sur le <form> ou le bouton d'envoi : data-confirm-title, data-confirm-message,
+    // data-confirm-ok (libellé du bouton), data-confirm-icon, data-confirm-danger (bouton rouge)
+    (() => {
+      const dialog = document.getElementById('confirmDialog');
+      let pending = null;
+
+      document.addEventListener('submit', (e) => {
+        const form = e.target;
+        const source = [e.submitter, form].find((el) => el && el.dataset && el.dataset.confirmMessage);
+        if (!source || form.dataset.confirmed) return;
+        e.preventDefault();
+        if (typeof dialog.showModal !== 'function') {
+          if (confirm(source.dataset.confirmMessage)) { form.dataset.confirmed = '1'; form.requestSubmit(e.submitter); }
+          return;
+        }
+        document.getElementById('confirmDialogTitle').textContent = source.dataset.confirmTitle || 'Confirmer';
+        document.getElementById('confirmDialogMessage').textContent = source.dataset.confirmMessage;
+        document.getElementById('confirmDialogIcon').textContent = source.dataset.confirmIcon || '❓';
+        const ok = document.getElementById('confirmDialogOk');
+        ok.textContent = source.dataset.confirmOk || 'Confirmer';
+        ok.classList.toggle('danger', 'confirmDanger' in source.dataset);
+        pending = { form, submitter: e.submitter };
+        dialog.showModal();
+      });
+
+      document.getElementById('confirmDialogOk').addEventListener('click', () => {
+        dialog.close();
+        if (!pending) return;
+        pending.form.dataset.confirmed = '1';
+        pending.form.requestSubmit(pending.submitter);
+        pending = null;
+      });
+      document.getElementById('confirmDialogBack').addEventListener('click', () => { dialog.close(); pending = null; });
+      dialog.addEventListener('click', (e) => { if (e.target === dialog) { dialog.close(); pending = null; } });
+    })();
+  </script>
+
+</body>
+</html>

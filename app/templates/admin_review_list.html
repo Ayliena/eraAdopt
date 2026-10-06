@@ -1,0 +1,74 @@
+{% extends 'admin_base.html' %}
+
+{% block title %}Annonces à valider{% endblock %}
+
+{% block content %}
+<div class="admin-title-row">
+  <h1>Annonces à valider</h1>
+  <span class="admin-count">{{ groups|length }} en attente</span>
+</div>
+<p class="admin-subtitle">
+  Les chats à adopter ensemble sont regroupés sur une seule ligne : ils seront validés ensemble.
+</p>
+
+{% if photo_errors %}
+<div class="admin-notice error">⚠ {{ photo_errors }} fichier{{ 's' if photo_errors > 1 }} photo n'{{ 'ont' if photo_errors > 1 else 'a' }} pas pu être supprimé{{ 's' if photo_errors > 1 }} du serveur (voir les logs). Les fiches sont bien à jour.</div>
+{% endif %}
+{% if published %}
+<div class="admin-notice success">
+  ✓ Annonce publiée : <strong>{{ published.adoption_names_display }}</strong>.
+  <a href="{{ url_for('cat_detail', uuid=published.uuid) }}">Voir sur le site</a>
+</div>
+{% endif %}
+
+{% if groups %}
+<div class="review-list">
+  <div class="review-row review-head" aria-hidden="true">
+    <span></span>
+    <span>Chat(s)</span>
+    <span>Créé par</span>
+    <span class="review-col-count">Chats</span>
+    <span></span>
+  </div>
+
+  {% for group in groups %}
+  <a href="{{ url_for('admin_review_group', uuid=group.main_cat.uuid) }}" class="review-row">
+    <span class="review-thumb">
+      {% if group.photo_url %}
+        <img src="{{ group.photo_url }}" alt="" loading="lazy">
+      {% else %}
+        <span class="review-thumb-empty">🐱</span>
+      {% endif %}
+    </span>
+
+    <span class="review-names">
+      {% for cat in group.cats %}
+        <span class="review-name">{{ cat.name }}{% if cat.status == 'ACCEPTED' %} <span class="review-tag" title="Fiche déjà publiée">publié</span>{% endif %}</span>{{ ', ' if not loop.last }}
+      {% endfor %}
+      <span class="review-date">En attente depuis le {{ group.created_at.strftime('%d/%m/%Y') }}</span>
+    </span>
+
+    <span class="review-creator">
+      <span class="review-label">Créé par</span>
+      {{ group.creators_display or '—' }}
+    </span>
+
+    <span class="review-col-count">
+      <span class="review-count-badge" title="{{ group.size }} chat{{ 's' if group.size > 1 else '' }}">{{ group.size }}</span>
+    </span>
+
+    <span class="review-arrow">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>Aucune annonce en attente</h3>
+  <p>Toutes les annonces ont été traitées. 🎉</p>
+</div>
+{% endif %}
+{% endblock %}
