@@ -1,0 +1,10 @@
+{# Symbole mâle / femelle en SVG : rendu identique sur tous les appareils
+   (les caractères ♂ / ♀ dépendent de polices de secours qui les décalent verticalement sur iOS).
+   Le style est porté par le SVG lui-même : rendu correct même si la feuille de style n'est pas (encore) chargée. #}
+{% macro sex_icon(sex) -%}
+  {%- if sex == 'MALE' -%}
+  <svg class="sex-icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="14" r="6"/><path d="M14.5 9.5L20 4M15 4h5v5"/></svg>
+  {%- else -%}
+  <svg class="sex-icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M12 15v7M9 19h6"/></svg>
+  {%- endif -%}
+{%- endmacro %}

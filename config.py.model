@@ -1,0 +1,47 @@
+import os
+
+# Statement for enabling the development environment
+DEBUG = True
+
+# Define the application directory
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# Set here the upload directory (relatif au dossier parent du projet)
+UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(BASE_DIR), 'uploads', 'eraAdopt'))
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
+# Nombre de photos max par annonce
+MAX_PHOTOS = 6
+# Taille max d'une requête, refusée avant traitement (photos réduites dans le navigateur avant envoi :
+# quelques centaines de Ko chacune, cette limite n'est qu'un garde-fou)
+MAX_CONTENT_LENGTH = 20 * 1024 * 1024  # 20 MB
+
+# Define the database
+SQLALCHEMY_DATABASE_URI = "mysql+mysqlconnector://{username}:{password}@{hostname}/{databasename}".format(
+    username="<your username>",
+    password="<your mysql password>",
+    hostname="localhost",
+    databasename="<your databasename>",
+)
+SQLALCHEMY_POOL_RECYCLE = 299
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+# Application "from" address
+FAWEB_MAILADDR='<email address>'
+
+# Enable protection against Cross-site Request Forgery (CSRF)
+CSRF_ENABLED = True
+
+# Use a secure, unique and secret key for signing data
+CSRF_SESSION_KEY = "<random string>"
+
+# Secret key for signing cookies
+# /!\ Connexion unique avec eraFA : doit être IDENTIQUE à la SECRET_KEY de eraFA (même environnement)
+SECRET_KEY = "<random string>"
+
+# Connexion unique avec eraFA : cookie de session partagé entre les sous-domaines
+# (mêmes valeurs à mettre dans la config de eraFA)
+SESSION_COOKIE_DOMAIN = "association-era.org"
+SESSION_COOKIE_NAME = "session"
+
+# URL de eraFA (connexion / déconnexion)
+ERAFA_URL = "https://fa.association-era.org"

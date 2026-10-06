@@ -1,0 +1,120 @@
+{% extends 'admin_base.html' %}
+
+{% block title %}Toutes les annonces{% endblock %}
+
+{% block content %}
+<div class="admin-title-row">
+  <h1>Toutes les annonces</h1>
+  <span class="admin-count">{{ groups|length }} {{ 'archivée' if archived else 'publiée' }}{{ 's' if groups|length > 1 }}</span>
+</div>
+<p class="admin-subtitle">
+  Les chats à adopter ensemble sont regroupés sur une seule ligne.
+</p>
+
+{% if photo_errors %}
+<div class="admin-notice error">⚠ {{ photo_errors }} fichier{{ 's' if photo_errors > 1 }} photo n'{{ 'ont' if photo_errors > 1 else 'a' }} pas pu être supprimé{{ 's' if photo_errors > 1 }} du serveur (voir les logs).</div>
+{% endif %}
+{% if archived_notice %}
+<div class="admin-notice success">✓ Annonce archivée : <strong>{{ archived_notice }}</strong>. Elle n'est plus visible sur le site.</div>
+{% endif %}
+{% if restored_notice %}
+<div class="admin-notice success">✓ Annonce remise en ligne : <strong>{{ restored_notice }}</strong>. Elle est de nouveau visible sur le site.</div>
+{% endif %}
+{% if deleted_notice %}
+<div class="admin-notice success">✓ Annonce supprimée : <strong>{{ deleted_notice }}</strong>.</div>
+{% endif %}
+
+<nav class="listing-tabs" aria-label="Statut des annonces">
+  <a href="{{ url_for('admin_listings') }}" class="listing-tab {{ 'active' if not archived }}">Publiées <span>{{ published_count }}</span></a>
+  <a href="{{ url_for('admin_listings', statut='archivees') }}" class="listing-tab {{ 'active' if archived }}">Archivées <span>{{ archived_count }}</span></a>
+</nav>
+
+{% if groups %}
+<div class="review-list">
+  <div class="review-row listing-row review-head" aria-hidden="true">
+    <span></span>
+    <span>Chat(s)</span>
+    <span>Créée le</span>
+    <span>Modifiée le</span>
+    <span>Créé par</span>
+    <span class="review-col-count">Chats</span>
+    <span>Actions</span>
+  </div>
+
+  {% for group in groups %}
+  <div class="review-row listing-row">
+    <span class="review-thumb">
+      {% if group.photo_url %}
+        <img src="{{ group.photo_url }}" alt="" loading="lazy">
+      {% else %}
+        <span class="review-thumb-empty">🐱</span>
+      {% endif %}
+    </span>
+
+    <span class="review-names">{{ group.names_display }}</span>
+
+    <span class="listing-date">
+      <span class="review-label">Créée le</span>
+      {{ group.created_at.strftime('%d/%m/%Y') }}
+    </span>
+
+    <span class="listing-date">
+      <span class="review-label">Modifiée le</span>
+      {{ group.updated_at.strftime('%d/%m/%Y') }}
+    </span>
+
+    <span class="review-creator">
+      <span class="review-label">Créé par</span>
+      {{ group.creators_display or '—' }}
+    </span>
+
+    <span class="review-col-count">
+      <span class="review-count-badge" title="{{ group.size }} chat{{ 's' if group.size > 1 else '' }}">{{ group.size }}</span>
+    </span>
+
+    <span class="listing-actions">
+      {% set uuid = group.main_cat.uuid %}
+      {% set what = ('ces ' ~ group.size ~ ' chats (' ~ group.names_display ~ ')') if group.size > 1 else group.names_display %}
+      {% if not archived %}
+      <a href="{{ url_for('cat_detail', uuid=uuid) }}" class="icon-btn" title="Voir l'annonce" aria-label="Voir l'annonce de {{ group.names_display }}">
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </a>
+      <a href="{{ url_for('admin_edit_listing', uuid=uuid) }}" class="icon-btn" title="Modifier" aria-label="Modifier l'annonce de {{ group.names_display }}">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+      </a>
+      <form method="POST" action="{{ url_for('admin_archive_listing', uuid=uuid) }}"
+        data-confirm-icon="🗄️" data-confirm-title="Archiver l'annonce ?" data-confirm-ok="Archiver"
+        data-confirm-message="L'annonce de {{ what }} ne sera plus visible sur le site. Elle restera consultable dans les annonces archivées.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="icon-btn warning" title="Archiver" aria-label="Archiver l'annonce de {{ group.names_display }}">
+          <svg viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        </button>
+      </form>
+      {% else %}
+      <form method="POST" action="{{ url_for('admin_restore_listing', uuid=uuid) }}"
+        data-confirm-icon="↩️" data-confirm-title="Remettre en ligne ?" data-confirm-ok="Remettre en ligne"
+        data-confirm-message="L'annonce de {{ what }} sera de nouveau visible sur le site des adoptions.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="icon-btn warning" title="Remettre en ligne" aria-label="Remettre en ligne l'annonce de {{ group.names_display }}">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        </button>
+      </form>
+      {% endif %}
+      <form method="POST" action="{{ url_for('admin_delete_listing', uuid=uuid) }}"
+        data-confirm-icon="🗑️" data-confirm-title="Supprimer définitivement ?" data-confirm-ok="Supprimer" data-confirm-danger
+        data-confirm-message="L'annonce de {{ what }} sera supprimée, avec ses fiches et ses photos. Cette action est irréversible.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="icon-btn danger" title="Supprimer" aria-label="Supprimer l'annonce de {{ group.names_display }}">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </form>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>Aucune annonce {{ 'archivée' if archived else 'publiée' }}</h3>
+</div>
+{% endif %}
+{% endblock %}

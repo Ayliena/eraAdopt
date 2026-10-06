@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ERA Adoptions - Nos chats à l'adoption</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=static_v('css/style.css')) }}">
+</head>
+
+<body>
+{% include '_user_bar.html' %}
+
+  <!-- En-tête -->
+  <header class="site-header">
+    <div class="header-container">
+{% include '_brand.html' %}
+      <span class="header-tag">Association Éthique & Respect Animal</span>
+    </div>
+  </header>
+
+  <!-- Contenu Principal -->
+  <main>
+    <section class="hero">
+      <h1>Nos protégés à l'adoption</h1>
+      <p>Découvrez nos chats qui attendent avec impatience leur famille pour la vie.</p>
+    </section>
+
+    <!-- Critères de recherche : bloc replié sur téléphone, ouvert ailleurs ; appliqués immédiatement sans rechargement -->
+    <section class="filter-section">
+      <details class="filter-panel" id="filterPanel">
+        <summary class="filter-summary">
+          <span>🔍 Critères de recherche</span>
+          <span class="filter-count" id="filterCount" {{ 'hidden' if not applied_filters }}>{{ applied_filters|length }}</span>
+          <svg class="filter-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </summary>
+
+        <form method="GET" action="/" class="filter-form" id="filterForm">
+          <fieldset class="filter-group">
+            <legend>Mon foyer</legend>
+            <label class="filter-check">
+              <input type="checkbox" name="good_with_cats" value="1" {{ 'checked' if filters.good_with_cats == '1' }}>
+              <span>🐱 J'ai déjà un ou plusieurs chats</span>
+            </label>
+            <label class="filter-check">
+              <input type="checkbox" name="good_with_children" value="1" {{ 'checked' if filters.good_with_children == '1' }}>
+              <span>👶 J'ai des enfants</span>
+            </label>
+            <label class="filter-check">
+              <input type="checkbox" name="no_outdoor" value="1" {{ 'checked' if filters.no_outdoor == '1' }}>
+              <span>🏠 Je n'ai pas d'accès extérieur <small>(jardin, cour…)</small></span>
+            </label>
+          </fieldset>
+
+          <fieldset class="filter-group">
+            <legend>Je souhaite adopter</legend>
+            {% for value, label in [('', 'Peu importe'), ('0', '🐱 Un seul chat'), ('1', '❤️ Plusieurs chats ensemble')] %}
+            <label class="filter-check">
+              <input type="radio" name="multiple_adoption" value="{{ value }}" {{ 'checked' if (filters.multiple_adoption or '') == value }}>
+              <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+          </fieldset>
+
+          <noscript><button type="submit" class="btn-primary filter-apply">Appliquer</button></noscript>
+        </form>
+      </details>
+      <script>
+        // Ouvert par défaut sur ordinateur / tablette, replié sur téléphone (même seuil que le CSS mobile)
+        if (window.matchMedia('(min-width: 641px)').matches) document.getElementById('filterPanel').open = true;
+      </script>
+    </section>
+
+    <div id="results" aria-live="polite">
+{% include '_results.html' %}
+    </div>
+  </main>
+
+  <!-- Pied de page -->
+{% include '_footer.html' %}
+
+  <script>
+    // Filtres appliqués sans rechargement : seule la liste des annonces (#results) est remplacée,
+    // le bloc de critères reste ouvert et l'URL est mise à jour (lien partageable, bouton retour).
+    (() => {
+      const form = document.getElementById('filterForm');
+      const results = document.getElementById('results');
+      const count = document.getElementById('filterCount');
+      let controller = null;
+
+      function currentParams() {
+        const params = new URLSearchParams();
+        for (const [key, value] of new FormData(form)) {
+          if (value) params.append(key, value);
+        }
+        return params;
+      }
+
+      async function refresh() {
+        const params = currentParams();
+        const query = params.toString();
+        const url = '/' + (query ? '?' + query : '');
+        history.replaceState(null, '', url);
+
+        count.textContent = [...params.keys()].length;
+        count.hidden = !query;
+
+        if (controller) controller.abort();
+        controller = new AbortController();
+        results.classList.add('is-loading');
+        try {
+          const response = await fetch('/?' + (query ? query + '&' : '') + 'partial=1', { signal: controller.signal });
+          if (!response.ok) throw new Error(response.status);
+          results.innerHTML = await response.text();
+          results.classList.remove('is-loading');
+        } catch (e) {
+          if (e.name !== 'AbortError') window.location.href = url;  // en cas d'erreur : rechargement classique
+        }
+      }
+
+      form.addEventListener('change', refresh);
+      form.addEventListener('submit', (e) => { e.preventDefault(); refresh(); });
+
+      // Bouton "Voir tous les chats" (aucun résultat) : décoche tout sans recharger
+      results.addEventListener('click', (e) => {
+        const link = e.target.closest('[data-remove]');
+        if (!link) return;
+        e.preventDefault();
+        const key = link.dataset.remove;
+        for (const input of form.elements) {
+          if (!input.name || (key !== 'all' && input.name !== key)) continue;
+          if (input.type === 'radio') input.checked = input.value === '';
+          else input.checked = false;
+        }
+        refresh();
+      });
+    })();
+  </script>
+
+</body>
+
+</html>
