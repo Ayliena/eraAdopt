@@ -29,7 +29,7 @@ def dev_only(view):
     return wrapper
 
 def admin_required(view):
-    """Réserve une route aux admins des adoptions (connexion via eraFA)."""
+    """Réserve une route aux comptes qui valident les annonces (droit eraFA PRIV_ANNVAL, connexion via eraFA)."""
     @wraps(view)
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
