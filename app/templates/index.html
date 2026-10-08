@@ -36,6 +36,12 @@
         </summary>
 
         <form method="GET" action="/" class="filter-form" id="filterForm">
+          <div class="filter-search">
+            <label for="filterName">Nom du chat</label>
+            <input type="search" id="filterName" name="nom" value="{{ name_search }}" maxlength="100"
+              placeholder="Ex. : Félix" autocomplete="off" enterkeyhint="search">
+          </div>
+
           <fieldset class="filter-group">
             <legend>Mon foyer</legend>
             <label class="filter-check">
@@ -118,8 +124,16 @@
         }
       }
 
-      form.addEventListener('change', refresh);
-      form.addEventListener('submit', (e) => { e.preventDefault(); refresh(); });
+      // Cases et choix : mise à jour immédiate. Recherche par nom : 300 ms après la dernière frappe
+      // (une seule requête quand on tape un nom d'une traite), ou tout de suite avec Entrée.
+      let typingTimer = null;
+      form.addEventListener('change', (e) => { if (e.target.type !== 'search') refresh(); });
+      form.addEventListener('input', (e) => {
+        if (e.target.type !== 'search') return;
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(refresh, 300);
+      });
+      form.addEventListener('submit', (e) => { e.preventDefault(); clearTimeout(typingTimer); refresh(); });
 
       // Bouton "Voir tous les chats" (aucun résultat) : décoche tout sans recharger
       results.addEventListener('click', (e) => {
@@ -130,6 +144,7 @@
         for (const input of form.elements) {
           if (!input.name || (key !== 'all' && input.name !== key)) continue;
           if (input.type === 'radio') input.checked = input.value === '';
+          else if (input.type === 'search') input.value = '';
           else input.checked = false;
         }
         refresh();

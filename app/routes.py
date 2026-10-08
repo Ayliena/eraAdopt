@@ -10,7 +10,7 @@ from app import app, db, login_manager
 from app.models import AdoptionCat, User, build_groups, build_review_groups, photo_public_url
 from app import review_form
 from app.seed_data import SEED_CATS, COLOR_PHOTOS
-from app.helpers import slugify_name, build_contact_mailto
+from app.helpers import slugify_name, build_contact_mailto, fold_text
 
 ADOPTION_MAILADDR = 'adoptions@association-era.org'
 
@@ -91,6 +91,20 @@ def index():
         good_with_children = request.args.get('good_with_children')
         no_outdoor = request.args.get('no_outdoor')
         multiple_adoption = request.args.get('multiple_adoption')
+        name_search = request.args.get('nom', '').strip()[:100]
+
+        # 0. Recherche par nom : l'annonce apparaît si l'un de ses chats correspond (le chat de référence ou
+        # un chat lié publié). Majuscules et accents sont ignorés grâce à l'interclassement utf8mb4_unicode_ci
+        # de la table : "felix" trouve "Félix".
+        if name_search:
+            pattern = '%' + name_search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
+            same_listing = aliased(AdoptionCat)
+            linked_name_match = db.select(same_listing.id).where(
+                same_listing.status == 'ACCEPTED',
+                same_listing.name.like(pattern, escape='\\'),
+                func.json_contains(AdoptionCat.linked_cats, func.json_quote(same_listing.uuid)) == 1
+            ).exists()
+            query = query.filter(db.or_(AdoptionCat.name.like(pattern, escape='\\'), linked_name_match))
 
         # 1. Filtre entente chats (si coché: le foyer a des chats, donc le chat doit être sociable chats)
         if good_with_cats == '1':
@@ -129,6 +143,7 @@ def index():
         good_with_children = None
         no_outdoor = None
         multiple_adoption = None
+        name_search = ''
 
     active_filters = {
         'good_with_cats': good_with_cats,
@@ -139,6 +154,8 @@ def index():
 
     # Critères effectivement appliqués (repris dans les liens de pagination)
     applied = {k: v for k, v in active_filters.items() if v in FILTER_VALUES[k]}
+    if name_search:
+        applied['nom'] = name_search
 
     # ?partial=1 : uniquement la liste des annonces (mise à jour sans rechargement par les filtres)
     template = '_results.html' if request.args.get('partial') == '1' else 'index.html'
@@ -147,6 +164,7 @@ def index():
         cats=cats,
         pagination=pagination,
         filters=active_filters,
+        name_search=name_search,
         applied_filters=applied,
     )
 
@@ -190,14 +208,26 @@ def admin_review_list():
 def admin_listings():
     """Toutes les annonces publiées (ou archivées avec ?statut=archivees), regroupées par adoption."""
     archived = request.args.get('statut') == 'archivees'
+    search = request.args.get('q', '').strip()[:100]
     published_groups = build_groups('ACCEPTED')
     archived_groups = build_groups('ARCHIVED')
+
+    # Recherche : nom d'un des chats (contient, sans accents ni majuscules) ou référence (début de l'uuid,
+    # celle citée dans les mails de demande d'adoption). Appliquée aux deux onglets, pour leurs compteurs.
+    if search:
+        name_part, ref_part = fold_text(search), search.lower()
+        def matches(group):
+            return any(name_part in fold_text(c.name) or c.uuid.lower().startswith(ref_part) for c in group.cats)
+        published_groups = [g for g in published_groups if matches(g)]
+        archived_groups = [g for g in archived_groups if matches(g)]
+
     groups = archived_groups if archived else published_groups
     groups.sort(key=lambda g: g.created_at, reverse=True)  # plus récentes d'abord
     return render_template(
         'admin_listings.html',
         groups=groups,
         archived=archived,
+        search=search,
         archived_notice=request.args.get('archivee'),
         restored_notice=request.args.get('remise'),
         deleted_notice=request.args.get('supprimee'),
