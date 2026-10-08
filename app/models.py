@@ -4,7 +4,8 @@ from flask_login import UserMixin
 from app import db
 
 # Droits eraFA (cf. eraFA app/permissions.py) : position dans User.PrivStr
-PRIV_ADMIN = 26   # "Administration du site"
+PRIV_ANNAD = 34   # "Rédaction d'annonces d'adoption" (création, sur eraFA)
+PRIV_ANNVAL = 35  # "Publication d'annonces d'adoption" (validation et gestion, sur ce site)
 
 def join_names_fr(names):
     """'Titi' / 'Titi et Toto' / 'Titi, Toto et Tutu'."""
@@ -200,8 +201,13 @@ class User(UserMixin, db.Model):
 
     @property
     def is_adoption_admin(self):
-        """Peut gérer les fiches d'adoption (en attendant un droit dédié dans eraFA)."""
-        return self.has_privilege(PRIV_ADMIN)
+        """Peut valider, publier et gérer les annonces (droit eraFA PRIV_ANNVAL)."""
+        return self.has_privilege(PRIV_ANNVAL)
+
+    @property
+    def can_write_listings(self):
+        """Peut créer des annonces depuis eraFA (droit eraFA PRIV_ANNAD)."""
+        return self.has_privilege(PRIV_ANNAD)
 
     @property
     def display_name(self):

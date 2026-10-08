@@ -1,8 +1,11 @@
 {% if current_user.is_authenticated %}
   <div class="user-bar">
     <div class="user-bar-container">
-      <span>👤 Connecté en tant que <strong>{{ current_user.display_name }}</strong>{% if current_user.is_adoption_admin %} <span class="user-bar-role">admin</span>{% endif %}</span>
+      <span>👤 Connecté en tant que <strong>{{ current_user.display_name }}</strong>{% if current_user.is_adoption_admin %} <span class="user-bar-role">validation</span>{% endif %}</span>
       <span class="user-bar-links">
+        {% if current_user.can_write_listings %}
+        <a href="{{ config.ERAFA_URL }}/annonce">Créer une annonce</a>
+        {% endif %}
         {% if current_user.is_adoption_admin %}
         <a href="{{ url_for('admin_listings') }}">Toutes les annonces</a>
         <a href="{{ url_for('admin_review_list') }}">Annonces à valider{% if review_count %} <span class="user-bar-count">{{ review_count }}</span>{% endif %}</a>
