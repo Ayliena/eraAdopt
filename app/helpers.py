@@ -44,3 +44,9 @@ def build_contact_mailto(cat, address: str) -> str:
     ])
     # quote (et non quote_plus) : les espaces deviennent %20, les clients mail n'interprètent pas '+'
     return f"mailto:{address}?" + urlencode({'subject': subject, 'body': body}, quote_via=quote)
+
+
+def fold_text(text: str) -> str:
+    """Texte sans accents ni majuscules, pour les recherches : 'Félix' -> 'felix'."""
+    decomposed = unicodedata.normalize('NFKD', text or '')
+    return ''.join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()

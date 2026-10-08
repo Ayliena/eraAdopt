@@ -24,10 +24,19 @@
 <div class="admin-notice success">✓ Annonce supprimée : <strong>{{ deleted_notice }}</strong>.</div>
 {% endif %}
 
-<nav class="listing-tabs" aria-label="Statut des annonces">
-  <a href="{{ url_for('admin_listings') }}" class="listing-tab {{ 'active' if not archived }}">Publiées <span>{{ published_count }}</span></a>
-  <a href="{{ url_for('admin_listings', statut='archivees') }}" class="listing-tab {{ 'active' if archived }}">Archivées <span>{{ archived_count }}</span></a>
-</nav>
+<div class="listing-toolbar">
+  <nav class="listing-tabs" aria-label="Statut des annonces">
+    <a href="{{ url_for('admin_listings', q=search or None) }}" class="listing-tab {{ 'active' if not archived }}">Publiées <span>{{ published_count }}</span></a>
+    <a href="{{ url_for('admin_listings', statut='archivees', q=search or None) }}" class="listing-tab {{ 'active' if archived }}">Archivées <span>{{ archived_count }}</span></a>
+  </nav>
+
+  <form method="GET" action="{{ url_for('admin_listings') }}" class="listing-search" role="search">
+    {% if archived %}<input type="hidden" name="statut" value="archivees">{% endif %}
+    <input type="search" name="q" value="{{ search }}" maxlength="100" placeholder="Nom ou référence (ex. : Félix, 39a0959b)" aria-label="Rechercher par nom ou référence">
+    <button type="submit" class="btn-dialog-primary">Rechercher</button>
+    {% if search %}<a href="{{ url_for('admin_listings', statut='archivees' if archived else None) }}" class="listing-search-clear">Effacer</a>{% endif %}
+  </form>
+</div>
 
 {% if groups %}
 <div class="review-list">
@@ -114,7 +123,12 @@
 </div>
 {% else %}
 <div class="empty-state">
+  {% if search %}
+  <h3>Aucune annonce {{ 'archivée' if archived else 'publiée' }} ne correspond à « {{ search }} »</h3>
+  {% if (archived_count if not archived else published_count) %}<p>Regardez dans l'onglet {{ 'Archivées' if not archived else 'Publiées' }}.</p>{% endif %}
+  {% else %}
   <h3>Aucune annonce {{ 'archivée' if archived else 'publiée' }}</h3>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

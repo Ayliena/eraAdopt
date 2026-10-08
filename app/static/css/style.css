@@ -226,6 +226,38 @@ main {
   border-top: 1px solid var(--border);
 }
 
+.filter-search {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+}
+
+.filter-search label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-search input {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  width: 100%;
+}
+
+.filter-search input:focus {
+  outline: none;
+  border-color: var(--primary-light);
+  background: #ffffff;
+}
+
 .filter-group {
   border: none;
   padding: 0;
@@ -1260,6 +1292,55 @@ a.review-row:hover {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+}
+
+.listing-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 20px;
+}
+
+.listing-toolbar .listing-tabs {
+  margin-bottom: 0;
+}
+
+.listing-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 320px;
+  max-width: 520px;
+}
+
+.listing-search input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.listing-search input:focus {
+  outline: none;
+  border-color: var(--primary-light);
+}
+
+.listing-search .btn-dialog-primary {
+  padding: 8px 16px;
+}
+
+.listing-search-clear {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .listing-tabs {
