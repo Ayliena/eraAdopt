@@ -206,6 +206,11 @@ def cat_detail(uuid):
         contact_mailto=build_contact_mailto(cat, ADOPTION_MAILADDR)
     )
 
+@app.errorhandler(404)
+def page_not_found(error):
+    """Page 404 aux couleurs du site ; message dédié pour une annonce (/chat/...) qui n'est plus disponible."""
+    return render_template('error_404.html', cat_link=request.path.startswith('/chat/')), 404
+
 @app.route('/mentions-legales')
 def legal_notice():
     return render_template('legal_notice.html')

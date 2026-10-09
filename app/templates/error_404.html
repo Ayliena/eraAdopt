@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>{{ 'Chat non disponible' if cat_link else 'Page introuvable' }} - ERA Adoptions</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=static_v('css/style.css')) }}">
+</head>
+<body>
+{% include '_user_bar.html' %}
+
+  <!-- En-tête -->
+  <header class="site-header">
+    <div class="header-container">
+{% include '_brand.html' %}
+      <span class="header-tag">Association Éthique & Respect Animal</span>
+    </div>
+  </header>
+
+  <main class="error-main">
+    <div class="error-card">
+      <span class="error-icon" aria-hidden="true">🐾</span>
+      {% if cat_link %}
+      <h1>Ce chat n'est plus disponible à l'adoption</h1>
+      <p>
+        Il a peut-être déjà trouvé sa famille, ou le lien que vous avez suivi est incomplet.
+        D'autres chats attendent encore la leur !
+      </p>
+      {% else %}
+      <h1>Page introuvable</h1>
+      <p>La page que vous cherchez n'existe pas ou n'est plus disponible.</p>
+      {% endif %}
+      <a href="/" class="btn-primary">Voir les chats à l'adoption</a>
+    </div>
+  </main>
+
+{% include '_footer.html' %}
+
+</body>
+</html>
