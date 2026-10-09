@@ -1735,6 +1735,41 @@ textarea.form-input {
   line-height: 1.5;
 }
 
+/* Page 404 */
+.error-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-card {
+  max-width: 520px;
+  text-align: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 36px 28px;
+}
+
+.error-icon {
+  font-size: 2.6rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.error-card h1 {
+  font-size: 1.5rem;
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+
+.error-card p {
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
 /* Footer */
 footer {
   text-align: center;
