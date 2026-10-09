@@ -7,7 +7,7 @@ from flask_login import current_user
 from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from app import app, db, login_manager
-from app.models import AdoptionCat, User, build_groups, build_review_groups, photo_public_url
+from app.models import AdoptionCat, User, build_groups, build_review_groups, photo_public_url, join_names_fr
 from app import review_form
 from app.seed_data import SEED_CATS, COLOR_PHOTOS
 from app.helpers import slugify_name, build_contact_mailto, fold_text
@@ -174,13 +174,35 @@ def cat_detail(uuid):
     Affiche l'annonce d'un chat, ou des chats à adopter ensemble, à partir de l'UUID de l'un d'eux.
     L'URL de n'importe quel chat de l'annonce fonctionne et redirige vers celle du chat de référence (le plus ancien).
     """
-    cat = AdoptionCat.query.filter_by(uuid=uuid, status='ACCEPTED').first_or_404()
+    cat = AdoptionCat.query.filter_by(uuid=uuid).first_or_404()
+
+    # Chat archivé (ex. adopté seul) dont des chats liés sont encore en ligne : son ancienne adresse
+    # mène à l'annonce de ces chats, avec un bandeau d'explication
+    if cat.status == 'ARCHIVED':
+        remaining = cat.get_linked_cats
+        if not remaining:
+            abort(404)
+        reference = min(remaining, key=lambda c: c.id).adoption_group[0]
+        return redirect(url_for('cat_detail', uuid=reference.uuid, indisponible=cat.uuid))
+    if cat.status != 'ACCEPTED':
+        abort(404)
+
     reference = cat.adoption_group[0]
     if reference.uuid != cat.uuid:
         return redirect(url_for('cat_detail', uuid=reference.uuid))
+
+    # Bandeau : uniquement pour un chat archivé réellement lié à cette annonce
+    unavailable = None
+    if request.args.get('indisponible'):
+        candidate = AdoptionCat.query.filter_by(uuid=request.args['indisponible'], status='ARCHIVED').first()
+        group_uuids = {c.uuid for c in cat.adoption_group}
+        if candidate and group_uuids & set(candidate.linked_cats or []):
+            unavailable = candidate
+
     return render_template(
         'cat_detail.html',
         cat=cat,
+        unavailable=unavailable,
         contact_mailto=build_contact_mailto(cat, ADOPTION_MAILADDR)
     )
 
@@ -229,7 +251,10 @@ def admin_listings():
         archived=archived,
         search=search,
         archived_notice=request.args.get('archivee'),
+        remaining_cat=(AdoptionCat.query.filter_by(uuid=request.args['reste'], status='ACCEPTED').first()
+                       if request.args.get('reste') else None),
         restored_notice=request.args.get('remise'),
+        still_archived_notice=request.args.get('encore_archive'),
         deleted_notice=request.args.get('supprimee'),
         photo_errors=request.args.get('photos_erreur', 0, type=int),
         published_count=len(published_groups),
@@ -299,25 +324,55 @@ def admin_edit_listing(uuid):
     """Modification d'une annonce publiée."""
     return group_form_page(find_group('ACCEPTED', uuid), 'edit')
 
+def selected_cats(group):
+    """Chats d'une annonce visés par une action : ceux cochés dans la popup (choix=1), sinon tous."""
+    if request.form.get('choix') == '1':
+        selected = set(request.form.getlist('cat_uuids'))
+        return [c for c in group.cats if c.uuid in selected]
+    return list(group.cats)
+
 @app.route('/admin/annonces/<uuid>/archiver', methods=['POST'])
 @admin_required
 def admin_archive_listing(uuid):
-    """Archive une annonce publiée (tous ses chats) : elle n'est plus visible du public."""
+    """
+    Archive une annonce publiée : tous ses chats, ou seulement ceux cochés (cat_uuids), par exemple un chat
+    adopté seul. Les chats restants gardent leur annonce ; leurs liens (linked_cats) sont conservés, si bien
+    qu'un chat remis en ligne rejoint automatiquement son groupe.
+    """
     group = find_group('ACCEPTED', uuid)
-    for cat in group.cats:
+    to_archive = selected_cats(group)
+    if not to_archive:
+        return redirect(url_for('admin_listings'))
+    remaining = [c for c in group.cats if c not in to_archive]
+
+    for cat in to_archive:
         cat.status = 'ARCHIVED'
     db.session.commit()
-    return redirect(url_for('admin_listings', archivee=group.names_display))
+
+    archived_names = join_names_fr(c.name for c in to_archive)
+    if remaining:
+        # rappel : la description et les photos communes parlent peut-être encore des chats archivés
+        return redirect(url_for('admin_listings', archivee=archived_names, reste=remaining[0].uuid))
+    return redirect(url_for('admin_listings', archivee=archived_names))
 
 @app.route('/admin/annonces/<uuid>/remettre-en-ligne', methods=['POST'])
 @admin_required
 def admin_restore_listing(uuid):
-    """Remet en ligne une annonce archivée (tous ses chats repassent ACCEPTED, photos intactes)."""
+    """
+    Remet en ligne une annonce archivée : tous ses chats, ou seulement ceux cochés (cat_uuids). Photos intactes.
+    Un chat remis en ligne rejoint automatiquement les chats de son annonce encore publiés (linked_cats conservés).
+    """
     group = find_group('ARCHIVED', uuid)
-    for cat in group.cats:
+    to_restore = selected_cats(group)
+    if not to_restore:
+        return redirect(url_for('admin_listings', statut='archivees'))
+    still_archived = [c for c in group.cats if c not in to_restore]
+
+    for cat in to_restore:
         cat.status = 'ACCEPTED'
     db.session.commit()
-    return redirect(url_for('admin_listings', statut='archivees', remise=group.names_display))
+    return redirect(url_for('admin_listings', statut='archivees', remise=join_names_fr(c.name for c in to_restore),
+                            encore_archive=join_names_fr(c.name for c in still_archived) or None))
 
 @app.route('/admin/annonces/<uuid>/supprimer', methods=['POST'])
 @admin_required

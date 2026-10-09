@@ -14,11 +14,17 @@
 {% if photo_errors %}
 <div class="admin-notice error">⚠ {{ photo_errors }} fichier{{ 's' if photo_errors > 1 }} photo n'{{ 'ont' if photo_errors > 1 else 'a' }} pas pu être supprimé{{ 's' if photo_errors > 1 }} du serveur (voir les logs).</div>
 {% endif %}
-{% if archived_notice %}
+{% if archived_notice and remaining_cat %}
+<div class="admin-notice success">
+  ✓ Archivé : <strong>{{ archived_notice }}</strong>. L'annonce de <strong>{{ remaining_cat.adoption_names_display }}</strong> reste en ligne.<br>
+  Si sa description ou ses photos parlent encore de {{ archived_notice }}, pensez à les mettre à jour :
+  <a href="{{ url_for('admin_edit_listing', uuid=remaining_cat.uuid) }}">Modifier l'annonce</a>
+</div>
+{% elif archived_notice %}
 <div class="admin-notice success">✓ Annonce archivée : <strong>{{ archived_notice }}</strong>. Elle n'est plus visible sur le site.</div>
 {% endif %}
 {% if restored_notice %}
-<div class="admin-notice success">✓ Annonce remise en ligne : <strong>{{ restored_notice }}</strong>. Elle est de nouveau visible sur le site.</div>
+<div class="admin-notice success">✓ Remis en ligne : <strong>{{ restored_notice }}</strong>, de nouveau visible sur le site.{% if still_archived_notice %} Reste dans les archives : <strong>{{ still_archived_notice }}</strong>.{% endif %}</div>
 {% endif %}
 {% if deleted_notice %}
 <div class="admin-notice success">✓ Annonce supprimée : <strong>{{ deleted_notice }}</strong>.</div>
@@ -91,6 +97,14 @@
       <a href="{{ url_for('admin_edit_listing', uuid=uuid) }}" class="icon-btn" title="Modifier" aria-label="Modifier l'annonce de {{ group.names_display }}">
         <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
       </a>
+      {% if group.size > 1 %}
+      {# Plusieurs chats : popup avec le choix des chats à archiver (ex. un chat adopté seul) #}
+      <button type="button" class="icon-btn warning js-archive-choice" data-mode="archive" title="Archiver" aria-label="Archiver des chats de l'annonce de {{ group.names_display }}"
+        data-action="{{ url_for('admin_archive_listing', uuid=uuid) }}"
+        data-cats='[{% for c in group.cats %}{{ {"uuid": c.uuid, "name": c.name}|tojson }}{{ "," if not loop.last }}{% endfor %}]'>
+        <svg viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+      </button>
+      {% else %}
       <form method="POST" action="{{ url_for('admin_archive_listing', uuid=uuid) }}"
         data-confirm-icon="🗄️" data-confirm-title="Archiver l'annonce ?" data-confirm-ok="Archiver"
         data-confirm-message="L'annonce de {{ what }} ne sera plus visible sur le site. Elle restera consultable dans les annonces archivées.">
@@ -99,6 +113,14 @@
           <svg viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
         </button>
       </form>
+      {% endif %}
+      {% elif group.size > 1 %}
+      {# Plusieurs chats archivés : popup avec le choix des chats à remettre en ligne #}
+      <button type="button" class="icon-btn warning js-archive-choice" data-mode="restore" title="Remettre en ligne" aria-label="Remettre en ligne des chats de {{ group.names_display }}"
+        data-action="{{ url_for('admin_restore_listing', uuid=uuid) }}"
+        data-cats='[{% for c in group.cats %}{{ {"uuid": c.uuid, "name": c.name}|tojson }}{{ "," if not loop.last }}{% endfor %}]'>
+        <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      </button>
       {% else %}
       <form method="POST" action="{{ url_for('admin_restore_listing', uuid=uuid) }}"
         data-confirm-icon="↩️" data-confirm-title="Remettre en ligne ?" data-confirm-ok="Remettre en ligne"
@@ -131,4 +153,83 @@
   {% endif %}
 </div>
 {% endif %}
+
+<!-- Popup d'archivage ou de remise en ligne d'une annonce de plusieurs chats : choix des chats concernés -->
+<dialog class="confirm-dialog" id="archiveDialog" aria-labelledby="archiveDialogTitle">
+  <form method="POST" class="confirm-dialog-body" id="archiveForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="choix" value="1">
+    <span class="confirm-dialog-icon" id="archiveDialogIcon"></span>
+    <h3 id="archiveDialogTitle"></h3>
+    <p id="archiveDialogText"></p>
+    <div class="archive-choices" id="archiveChoices"></div>
+    <p class="archive-summary" id="archiveSummary"></p>
+    <div class="confirm-dialog-actions">
+      <button type="button" class="btn-dialog-secondary" id="archiveCancel">Annuler</button>
+      <button type="submit" class="btn-dialog-primary" id="archiveSubmit"></button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  (() => {
+    const dialog = document.getElementById('archiveDialog');
+    const form = document.getElementById('archiveForm');
+    const choices = document.getElementById('archiveChoices');
+    const summary = document.getElementById('archiveSummary');
+    const submit = document.getElementById('archiveSubmit');
+    const MODES = {
+      archive: {
+        icon: '🗄️', title: "Archiver des chats de l'annonce", ok: 'Archiver',
+        text: 'Cochez les chats à archiver, par exemple ceux qui ont été adoptés. Ils ne seront plus visibles sur le site ; les autres restent en ligne.',
+        all: "L'annonce entière sera archivée.", rest: ' restera en ligne.',
+      },
+      restore: {
+        icon: '↩️', title: 'Remettre en ligne des chats', ok: 'Remettre en ligne',
+        text: 'Cochez les chats à remettre en ligne. Ils rejoindront les chats de leur annonce encore publiés ; les autres restent dans les archives.',
+        all: 'Tous ces chats seront remis en ligne.', rest: ' restera dans les archives.',
+      },
+    };
+    let mode = MODES.archive;
+
+    function update() {
+      const boxes = [...choices.querySelectorAll('input')];
+      const kept = boxes.filter((b) => !b.checked).map((b) => b.dataset.name);
+      const count = boxes.length - kept.length;
+      submit.disabled = count === 0;
+      summary.textContent = count === 0 ? 'Cochez au moins un chat.'
+        : kept.length === 0 ? mode.all
+        : kept.join(', ') + mode.rest;
+    }
+
+    document.querySelectorAll('.js-archive-choice').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        mode = MODES[btn.dataset.mode] || MODES.archive;
+        document.getElementById('archiveDialogIcon').textContent = mode.icon;
+        document.getElementById('archiveDialogTitle').textContent = mode.title;
+        document.getElementById('archiveDialogText').textContent = mode.text;
+        submit.textContent = mode.ok;
+        form.action = btn.dataset.action;
+        choices.innerHTML = '';
+        JSON.parse(btn.dataset.cats).forEach((cat) => {
+          const label = document.createElement('label');
+          label.className = 'archive-choice';
+          const box = document.createElement('input');
+          box.type = 'checkbox';
+          box.name = 'cat_uuids';
+          box.value = cat.uuid;
+          box.checked = true;
+          box.dataset.name = cat.name;
+          box.addEventListener('change', update);
+          label.append(box, document.createTextNode(' ' + cat.name));
+          choices.appendChild(label);
+        });
+        update();
+        dialog.showModal();
+      });
+    });
+    document.getElementById('archiveCancel').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+  })();
+</script>
 {% endblock %}
