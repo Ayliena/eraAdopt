@@ -47,6 +47,11 @@
   </header>
 
   <main class="detail-main">
+    {% if unavailable %}
+    <div class="detail-notice">
+      {{ unavailable.name }} n'est plus disponible à l'adoption. Cette annonce concerne désormais {{ names }}.
+    </div>
+    {% endif %}
     <div class="detail-grid">
 
       <!-- Colonne Gauche : Galerie Photos -->
