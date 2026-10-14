@@ -31,6 +31,14 @@
   {% elif value is sameas false %}<span class="status-tag tag-yes">Négatif</span>
   {% else %}<span class="status-tag tag-unknown">Non testé</span>{% endif %}
 {% endmacro %}
+{# Résultats FIV / FeLV sur une seule ligne #}
+{% macro tests_tags(c) %}<span class="tests-pair">{{ test_tag(c.fiv) }}<span class="tests-sep">/</span>{{ test_tag(c.felv) }}</span>{% endmacro %}
+{# Rappel des soins communs à tous les chats de l'association (accordé au genre : féminin si toutes des femelles) #}
+{% macro vet_note(cats, subject) %}
+  {% set e = 'e' if cats|selectattr('sex', 'equalto', 'MALE')|list|length == 0 else '' %}
+  {% set s = 's' if cats|length > 1 else '' %}
+  <p class="vet-note">Comme tous nos chats, {{ subject }} identifié{{ e }}{{ s }}, vacciné{{ e }}{{ s }} contre le typhus et le coryza et testé{{ e }}{{ s }} FIV / FeLV.</p>
+{% endmacro %}
 
   <!-- En-tête -->
   <header class="site-header">
@@ -153,12 +161,12 @@
               <dl class="group-cat-specs">
                 <div><dt>Âge</dt><dd>{{ c.age_years_months }}</dd></div>
                 <div><dt>Race</dt><dd>{{ c.breed or 'Européen' }}</dd></div>
-                <div><dt>Test FIV</dt><dd>{{ test_tag(c.fiv) }}</dd></div>
-                <div><dt>Test FeLV</dt><dd>{{ test_tag(c.felv) }}</dd></div>
+                <div><dt>FIV / FeLV</dt><dd>{{ tests_tags(c) }}</dd></div>
               </dl>
             </div>
             {% endfor %}
           </div>
+          {{ vet_note(group, 'elles sont' if group|selectattr('sex', 'equalto', 'MALE')|list|length == 0 else 'ils sont') }}
         </div>
         {% endif %}
 
@@ -185,9 +193,9 @@
         <div class="info-card">
           <h2>Informations vétérinaires</h2>
           <div class="specs-list">
-            {% call spec_row('🩺', 'Test FIV') %}{{ test_tag(cat.fiv) }}{% endcall %}
-            {% call spec_row('🩺', 'Test FeLV') %}{{ test_tag(cat.felv) }}{% endcall %}
+            {% call spec_row('🩺', 'Tests FIV / FeLV') %}{{ tests_tags(cat) }}{% endcall %}
           </div>
+          {{ vet_note([cat], cat.name ~ ' est') }}
         </div>
         {% endif %}
 
