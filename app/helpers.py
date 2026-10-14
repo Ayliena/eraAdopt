@@ -17,31 +17,40 @@ def slugify_name(name: str) -> str:
     text = re.sub(r'[^a-zA-Z0-9_-]', '', text)
     return text or "chat"
 
+# Corps du mail de demande d'adoption ; {intro} est remplacé par la phrase citant le ou les chats.
+# Également utilisé par la page d'une annonce "adoptables séparément", qui compose le mail dans le navigateur.
+MAIL_BODY_LINES = [
+    "Bonjour l'association ERA,",
+    "",
+    "{intro}",
+    "",
+    "Voici quelques informations sur mon foyer et mon projet d'adoption :",
+    "- Ville et type de logement (appartement / maison, avec ou sans extérieur) : ",
+    "- Composition du foyer (adultes, enfants) : ",
+    "- Présence d'autres animaux : ",
+    "",
+    "Merci d'avance pour votre retour,",
+    "",
+]
+
+
 def build_contact_mailto(cat, address: str) -> str:
     """
     Construit le lien mailto pré-rempli pour une demande d'adoption.
     Sujet et corps sont entièrement encodés : un nom contenant '&', '#' ou '?' ne coupe plus le mail.
     """
-    if cat.is_multiple_adoption:
+    if cat.is_multiple_adoption and not cat.is_separate_adoption:
         subject = f"Demande d'adoption conjointe pour {cat.adoption_names_display}"
         intro = f"Je vous contacte concernant l'adoption conjointe de {cat.adoption_refs_display}."
+    elif cat.is_multiple_adoption:
+        # mode "séparément" sans choix (navigateur sans JavaScript) : tous les chats de l'annonce sont cités
+        subject = f"Demande d'adoption pour {cat.adoption_names_display}"
+        intro = f"Je vous contacte concernant l'adoption de {cat.adoption_refs_display}."
     else:
         subject = f"Demande d'adoption pour {cat.name} (Ref: {(cat.uuid or '')[:8]})"
         intro = f"Je vous contacte concernant l'adoption de {cat.adoption_refs_display}."
 
-    body = "\r\n".join([
-        "Bonjour l'association ERA,",
-        "",
-        intro,
-        "",
-        "Voici quelques informations sur mon foyer et mon projet d'adoption :",
-        "- Ville et type de logement (appartement / maison, avec ou sans extérieur) : ",
-        "- Composition du foyer (adultes, enfants) : ",
-        "- Présence d'autres animaux : ",
-        "",
-        "Merci d'avance pour votre retour,",
-        "",
-    ])
+    body = "\r\n".join(MAIL_BODY_LINES).replace("{intro}", intro)
     # quote (et non quote_plus) : les espaces deviennent %20, les clients mail n'interprètent pas '+'
     return f"mailto:{address}?" + urlencode({'subject': subject, 'body': body}, quote_via=quote)
 

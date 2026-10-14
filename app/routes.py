@@ -10,7 +10,7 @@ from app import app, db, login_manager
 from app.models import AdoptionCat, User, build_groups, build_review_groups, photo_public_url, join_names_fr
 from app import review_form
 from app.seed_data import SEED_CATS, COLOR_PHOTOS
-from app.helpers import slugify_name, build_contact_mailto, fold_text
+from app.helpers import slugify_name, build_contact_mailto, fold_text, MAIL_BODY_LINES
 
 ADOPTION_MAILADDR = 'adoptions@association-era.org'
 
@@ -118,8 +118,10 @@ def index():
         if no_outdoor == '1':
             query = query.filter(AdoptionCat.outdoor_access.isnot(True))
 
-        # 4. Filtre adoption multiple (1 = à plusieurs, 0 = seul uniquement)
-        # Même règle que le badge (is_multiple_adoption) : au moins un chat lié ACCEPTED.
+        # 4. Filtre adoption seul / à plusieurs : "peut-on n'adopter qu'un seul chat ?"
+        #    - à plusieurs (1) : annonces de plusieurs chats à adopter ensemble uniquement
+        #    - seul (0) : chats seuls et annonces de chats adoptables séparément
+        # Annonce de plusieurs chats = au moins un chat lié ACCEPTED (même règle que le badge).
         # JSON_CONTAINS gère aussi bien le NULL SQL que la valeur JSON 'null'.
         if multiple_adoption in ('1', '0'):
             linked = aliased(AdoptionCat)
@@ -127,7 +129,8 @@ def index():
                 linked.status == 'ACCEPTED',
                 func.json_contains(AdoptionCat.linked_cats, func.json_quote(linked.uuid)) == 1
             ).exists()
-            query = query.filter(has_accepted_linked if multiple_adoption == '1' else ~has_accepted_linked)
+            together = db.and_(has_accepted_linked, AdoptionCat.adoption_mode == 'TOGETHER')
+            query = query.filter(together if multiple_adoption == '1' else ~together)
 
         # Pagination (12 annonces par page, ajustable via CATS_PER_PAGE dans la config)
         page = request.args.get('page', 1, type=int)
@@ -203,7 +206,9 @@ def cat_detail(uuid):
         'cat_detail.html',
         cat=cat,
         unavailable=unavailable,
-        contact_mailto=build_contact_mailto(cat, ADOPTION_MAILADDR)
+        contact_mailto=build_contact_mailto(cat, ADOPTION_MAILADDR),
+        mail_address=ADOPTION_MAILADDR,
+        mail_body_lines=MAIL_BODY_LINES
     )
 
 @app.errorhandler(404)
@@ -373,6 +378,14 @@ def admin_restore_listing(uuid):
         return redirect(url_for('admin_listings', statut='archivees'))
     still_archived = [c for c in group.cats if c not in to_restore]
 
+    # Les chats qui rejoignent une annonce encore publiée en reprennent le mode d'adoption
+    # (il a pu être modifié pendant leur archivage)
+    published = {c.id: c for cat in to_restore for c in cat.get_linked_cats}
+    if published:
+        mode = published[min(published)].adoption_mode
+        for cat in to_restore:
+            cat.adoption_mode = mode
+
     for cat in to_restore:
         cat.status = 'ACCEPTED'
     db.session.commit()
@@ -467,6 +480,7 @@ def seed_test():
                 reset.append(data['name'])
             for field, value in data.items():
                 setattr(cat, field, list(value) if isinstance(value, list) else value)
+            cat.adoption_mode = data.get('adoption_mode', 'TOGETHER')
 
         # Les annonces créées en dehors du jeu de test (ex. par les testeurs) sont publiées
         seed_uuids = [d['uuid'] for d in SEED_CATS]

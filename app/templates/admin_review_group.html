@@ -64,7 +64,14 @@
   <section class="info-card form-card">
     <h2>{{ 'Commun aux ' ~ cats|length ~ ' chats' if cats|length > 1 else "L'annonce" }}</h2>
     {% if cats|length > 1 %}
-    <p class="form-hint">Ces chats rejoindront le même foyer : entente, accès extérieur, description et photos sont partagés.</p>
+    <p class="form-hint">Ces chats partagent la même annonce : entente, accès extérieur, description et photos sont communs.</p>
+    {% endif %}
+
+    {% if group.size > 1 %}
+    <div class="form-field">
+      <span class="form-label">Mode d'adoption <span class="form-label-hint">(à adopter ensemble, ou un par un, ex. une portée)</span></span>
+      {{ seg('adoption_mode', form.MODE_CHOICES, common.adoption_mode, errors.get('adoption_mode')) }}
+    </div>
     {% endif %}
 
     <div class="form-grid">

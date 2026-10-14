@@ -41,6 +41,9 @@ CREATE TABLE `adoption_cats` (
   -- Chats liés (liste d'UUIDs au format JSON, ex: ["uuid-1", "uuid-2"] ; NULL = chat seul)
   `linked_cats` JSON DEFAULT NULL COMMENT 'Liste des UUIDs des chats à adopter ensemble',
 
+  -- Mode d'adoption d'une annonce de plusieurs chats (ignoré pour un chat seul)
+  `adoption_mode` ENUM('TOGETHER', 'SEPARATE') NOT NULL DEFAULT 'TOGETHER' COMMENT 'Annonce de plusieurs chats : à adopter ensemble (TOGETHER) ou séparément (SEPARATE)',
+
   -- Créateur de la fiche (compte eraFA)
   `created_by` INT(11) NOT NULL COMMENT 'Créateur de la fiche (càd: users.id)',
 

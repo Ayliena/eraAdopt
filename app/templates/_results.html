@@ -8,7 +8,11 @@
     {% set names = cat.adoption_names_display %}
     <a href="/chat/{{ cat.uuid }}" class="card-photo-wrapper" tabindex="-1" aria-hidden="true">
       {% if group|length > 1 %}
+      {% if group[0].adoption_mode == 'SEPARATE' %}
+      <span class="badge-multi-adoption separate">🐱 Adoptables séparément</span>
+      {% else %}
       <span class="badge-multi-adoption">❤️ Adoption multiple ({{ group|length }} chats)</span>
+      {% endif %}
       {% endif %}
       {% if cat.primary_photo_url %}
       <img src="{{ cat.primary_photo_url }}" alt="Photo de {{ names }}" class="card-photo" loading="lazy"
