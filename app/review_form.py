@@ -26,8 +26,11 @@ OWN_BOOL = [
     ('felv', "Test FeLV", [('0', "Négatif"), ('1', "Positif")]),
 ]
 SEX_CHOICES = [('MALE', "Mâle"), ('FEMALE', "Femelle")]
+# Annonce de plusieurs chats uniquement
+MODE_CHOICES = [('TOGETHER', "À adopter ensemble"), ('SEPARATE', "Adoptables séparément")]
 
-COMMON_LABELS = dict([(f, l) for f, l, _ in COMMON_BOOL] + [('description', "Description"), ('photos', "Photos")])
+COMMON_LABELS = dict([(f, l) for f, l, _ in COMMON_BOOL] + [('description', "Description"), ('photos', "Photos"),
+                                                             ('adoption_mode', "Mode d'adoption")])
 
 
 def bool_to_form(value):
@@ -75,12 +78,13 @@ def initial_values(group):
     ref = cats[0]
     common = {f: bool_to_form(getattr(ref, f)) for f, _, _ in COMMON_BOOL}
     common['description'] = ref.description or ''
+    common['adoption_mode'] = ref.adoption_mode or 'TOGETHER'
     common['photos_delete'] = []
     ref_photos = [p for p in (ref.photos if isinstance(ref.photos, list) else []) if p]
     common['photo_main'] = ref_photos[0] if ref_photos else ''
 
     differences = []
-    for field in [f for f, _, _ in COMMON_BOOL] + ['description', 'photos']:
+    for field in [f for f, _, _ in COMMON_BOOL] + ['description', 'photos', 'adoption_mode']:
         if len({repr(getattr(c, field) or None) for c in cats}) > 1:
             differences.append(COMMON_LABELS[field])
 
@@ -114,6 +118,14 @@ def parse_form(form, group):
     common['description'] = form.get('description', '').strip()
     if not common['description']:
         errors['description'] = "La description est obligatoire."
+
+    # Mode d'adoption : choisi seulement pour une annonce de plusieurs chats, sinon inchangé
+    if group.size > 1:
+        common['adoption_mode'] = form.get('adoption_mode', '')
+        if common['adoption_mode'] not in [v for v, _ in MODE_CHOICES]:
+            errors['adoption_mode'] = "Choisissez une valeur."
+    else:
+        common['adoption_mode'] = cats[0].adoption_mode or 'TOGETHER'
 
     # Photos : celles du groupe, moins celles marquées pour suppression (jamais de chemin arbitraire)
     available = all_photos(group)
@@ -175,6 +187,7 @@ def apply_values(group, common, own):
         for field, _, _ in COMMON_BOOL:
             setattr(c, field, form_to_bool(common[field]))
         c.description = common['description']
+        c.adoption_mode = common['adoption_mode']
         c.photos = list(common['photos'])
 
         values = own[c.id]

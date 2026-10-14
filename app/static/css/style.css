@@ -392,6 +392,10 @@ main {
   overflow: hidden;
 }
 
+.badge-multi-adoption.separate {
+  background: rgba(30, 95, 93, 0.92);
+}
+
 .badge-multi-adoption {
   position: absolute;
   top: 12px;
@@ -405,6 +409,9 @@ main {
   padding: 5px 11px;
   border-radius: 999px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
   letter-spacing: 0.3px;
   display: inline-flex;
   align-items: center;
@@ -1768,6 +1775,13 @@ textarea.form-input {
   color: var(--text-muted);
   line-height: 1.6;
   margin-bottom: 24px;
+}
+
+/* Annonce de chats adoptables séparément */
+.detail-subtitle {
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 /* Footer */

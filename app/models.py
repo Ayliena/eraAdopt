@@ -60,6 +60,8 @@ class AdoptionCat(db.Model):
     # none_as_null : None est stocké en NULL SQL et non en valeur JSON 'null'
     photos = db.Column(db.JSON(none_as_null=True), nullable=False)  # 1 à 6 photos
     linked_cats = db.Column(db.JSON(none_as_null=True), nullable=True)
+    # Annonce de plusieurs chats : à adopter ensemble (TOGETHER) ou séparément (SEPARATE) ; ignoré pour un chat seul
+    adoption_mode = db.Column(db.Enum('TOGETHER', 'SEPARATE', name='adoption_mode_enum'), default='TOGETHER', nullable=False)
 
     # Créateur de la fiche (users.id dans eraFA), renseigné par la page de création
     created_by = db.Column(db.Integer, nullable=False, index=True)
@@ -108,6 +110,12 @@ class AdoptionCat(db.Model):
         Le premier est le chat de référence de l'annonce (carte de l'accueil, URL canonique).
         """
         return sorted([self] + self.get_linked_cats, key=lambda c: c.id)
+
+    @property
+    def is_separate_adoption(self):
+        """Annonce de plusieurs chats adoptables séparément (le mode est porté par le chat de référence)."""
+        group = self.adoption_group
+        return len(group) > 1 and group[0].adoption_mode == 'SEPARATE'
 
     @property
     def adoption_names_display(self):

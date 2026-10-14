@@ -115,6 +115,9 @@
           <div class="name-row">
             <h1>{{ names }}</h1>
           </div>
+          {% if cat.is_separate_adoption %}
+          <p class="detail-subtitle">🐾 Ces chats partagent la même annonce, mais ils peuvent être adoptés séparément.</p>
+          {% endif %}
           {% else %}
           <div class="name-row">
             <h1>{{ cat.name }}</h1>
@@ -189,7 +192,39 @@
         {% endif %}
 
         <!-- Appel à l'action -->
-        {% if multi %}
+        {% if multi and cat.is_separate_adoption %}
+          <div class="cta-box">
+            <div class="cta-text">
+              <h3>Un ou plusieurs de ces chats vous intéressent ?</h3>
+              <p>Contactez notre équipe d'adoption pour échanger sur leur profil et organiser une rencontre.</p>
+            </div>
+            {# Sans JavaScript, le lien cite tous les chats de l'annonce #}
+            <a href="{{ contact_mailto }}" class="btn-cta" id="separateAdoptionCta">
+              Nous contacter
+            </a>
+          </div>
+
+          <!-- Popup : choix du ou des chats qui intéressent (adoptables séparément) -->
+          <dialog class="confirm-dialog" id="separateAdoptionDialog" aria-labelledby="separateAdoptionTitle">
+            <div class="confirm-dialog-body">
+              <span class="confirm-dialog-icon">🐾</span>
+              <h3 id="separateAdoptionTitle">Quel(s) chat(s) vous intéresse(nt) ?</h3>
+              <p>Ces chats peuvent être adoptés séparément : cochez celui ou ceux pour lesquels vous souhaitez nous écrire.</p>
+              <div class="archive-choices">
+                {% for c in group %}
+                <label class="archive-choice">
+                  <input type="checkbox" value="{{ c.uuid }}" data-name="{{ c.name }}" data-ref="{{ c.uuid[:8] }}">
+                  {{ c.name }}
+                </label>
+                {% endfor %}
+              </div>
+              <div class="confirm-dialog-actions">
+                <button type="button" class="btn-dialog-secondary" id="separateAdoptionBack">Retour</button>
+                <button type="button" class="btn-dialog-primary" id="separateAdoptionOk" disabled>Continuer</button>
+              </div>
+            </div>
+          </dialog>
+        {% elif multi %}
           <div class="cta-box">
             <div class="cta-text">
               <h3>Vous avez un coup de cœur pour {{ names }} ?</h3>
@@ -254,6 +289,47 @@
         if (e.target === multiDialog) multiDialog.close();
       });
     }
+  </script>
+
+  <!-- Script pour la popup des chats adoptables séparément : le mail est composé avec les chats choisis -->
+  <script>
+    (() => {
+      const cta = document.getElementById('separateAdoptionCta');
+      const dialog = document.getElementById('separateAdoptionDialog');
+      if (!cta || !dialog || typeof dialog.showModal !== 'function') return;
+
+      const MAIL_ADDRESS = {{ mail_address|tojson }};
+      const MAIL_BODY_LINES = {{ mail_body_lines|tojson }};
+      const boxes = [...dialog.querySelectorAll('input[type="checkbox"]')];
+      const ok = document.getElementById('separateAdoptionOk');
+
+      const joinFr = (names) => names.length <= 1 ? names.join('') : names.slice(0, -1).join(', ') + ' et ' + names[names.length - 1];
+
+      function buildMailto(cats) {
+        const subject = cats.length === 1
+          ? `Demande d'adoption pour ${cats[0].name} (Ref: ${cats[0].ref})`
+          : `Demande d'adoption pour ${joinFr(cats.map((c) => c.name))}`;
+        const intro = `Je vous contacte concernant l'adoption de ${cats.map((c) => `${c.name} (Réf: ${c.ref})`).join(', ')}.`;
+        const body = MAIL_BODY_LINES.join('\r\n').replace('{intro}', intro);
+        return `mailto:${MAIL_ADDRESS}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      }
+
+      boxes.forEach((box) => box.addEventListener('change', () => { ok.disabled = !boxes.some((b) => b.checked); }));
+      cta.addEventListener('click', (e) => {
+        e.preventDefault();
+        boxes.forEach((b) => { b.checked = false; });
+        ok.disabled = true;
+        dialog.showModal();
+      });
+      document.getElementById('separateAdoptionBack').addEventListener('click', () => dialog.close());
+      dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+      ok.addEventListener('click', () => {
+        const chosen = boxes.filter((b) => b.checked).map((b) => ({ name: b.dataset.name, ref: b.dataset.ref }));
+        if (!chosen.length) return;
+        dialog.close();
+        window.location.href = buildMailto(chosen);
+      });
+    })();
   </script>
 
   <!-- Script pour la galerie photo -->
