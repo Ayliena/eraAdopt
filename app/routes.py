@@ -7,6 +7,7 @@ from flask_login import current_user
 from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from app import app, db, login_manager
+from app.photos import PhotoError, remove_files
 from app.models import AdoptionCat, User, build_groups, build_review_groups, photo_public_url, join_names_fr
 from app import review_form
 from app.seed_data import SEED_CATS, COLOR_PHOTOS
@@ -286,14 +287,26 @@ def group_form_page(group, mode):
     """
     errors = {}
     if request.method == 'POST':
-        common, own, errors = review_form.parse_form(request.form, group)
+        common, own, errors = review_form.parse_form(request.form, request.files, group)
+        written = []
+        if not errors:
+            try:
+                written = review_form.save_new_photos(group, common, own, app.config['UPLOAD_FOLDER'])
+            except PhotoError as e:
+                errors['photos'] = f"Une photo n'a pas pu être traitée : {e}."
         if not errors:
             review_form.apply_values(group, common, own)
             publish = mode == 'review' and request.form.get('action') == 'publish'
             if publish:
                 for cat in review_form.editable_cats(group):
                     cat.status = 'ACCEPTED'
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception:
+                # base inchangée : les photos ajoutées ne servent à rien
+                db.session.rollback()
+                remove_files(written)
+                raise
 
             # Fichiers des photos retirées : supprimés du disque une fois la base à jour
             failed = review_form.delete_photo_files(common['photos_delete'], app.config['UPLOAD_FOLDER'], app.logger)
@@ -319,6 +332,8 @@ def group_form_page(group, mode):
         available_photos=review_form.photos_main_first(review_form.all_photos(group), common.get('photo_main')),
         saved=request.args.get('enregistre') == '1' and request.method == 'GET',
         photo_errors=request.args.get('photos_erreur', 0, type=int) if request.method == 'GET' else 0,
+        new_photos_lost=bool(errors and common.get('photos_new')),
+        max_photos=app.config.get('MAX_PHOTOS', 6),
         form=review_form,
     )
 

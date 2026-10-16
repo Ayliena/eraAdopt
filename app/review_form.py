@@ -7,12 +7,13 @@ Champs propres à chaque chat : name, sex, birthdate, breed, fiv, felv.
 
 Seuls les chats du statut traité (group.main_status) sont modifiés : en validation, un éventuel chat
 déjà ACCEPTED lié à l'annonce n'est pas touché.
-Les photos ne peuvent pas être ajoutées ici (page de création), seulement supprimées : le fichier est alors
-effacé du disque s'il n'est plus utilisé par aucune fiche.
+Photos : on peut en ajouter (même traitement et même nommage qu'à la création, cf. app/photos.py), choisir
+la principale et en supprimer : le fichier est alors effacé du disque s'il n'est plus utilisé par aucune fiche.
 """
 import os
 from datetime import date
 from flask import current_app
+from app import photos
 
 # Champs oui / non : (nom, libellé, [(valeur formulaire, libellé), ...]).
 # Entente et extérieur acceptent "Inconnu" (l'association peut ne pas savoir) ; FIV / FeLV sont obligatoires.
@@ -101,9 +102,9 @@ def initial_values(group):
     return common, own, differences
 
 
-def parse_form(form, group):
+def parse_form(form, files, group):
     """
-    Lit et valide le formulaire soumis.
+    Lit et valide le formulaire soumis (files : photos ajoutées).
     Retourne (common, own, errors) : valeurs telles que saisies (pour réafficher le formulaire)
     et dictionnaire d'erreurs {clé de champ: message}.
     """
@@ -127,19 +128,23 @@ def parse_form(form, group):
     else:
         common['adoption_mode'] = cats[0].adoption_mode or 'TOGETHER'
 
-    # Photos : celles du groupe, moins celles marquées pour suppression (jamais de chemin arbitraire)
+    # Photos : celles du groupe, moins celles marquées pour suppression (jamais de chemin arbitraire),
+    # plus les photos ajoutées (enregistrées par save_new_photos une fois le formulaire valide)
     available = all_photos(group)
     common['photos_delete'] = [p for p in form.getlist('photos_delete') if p in available]
     common['photos'] = [p for p in available if p not in common['photos_delete']]
-    # Photo principale choisie (cliquée) : placée en premier ; si elle est supprimée, la suivante prend sa place
+    common['photos_new'] = [f for f in files.getlist('photos_new') if f and f.filename]
+    # Photo principale choisie (cliquée) : placée en premier ; si elle est supprimée, la suivante prend sa place.
+    # Une photo ajoutée est désignée par 'new:<rang dans photos_new>'.
     common['photo_main'] = form.get('photo_main', '')
     if common['photo_main'] in common['photos']:
         common['photos'].remove(common['photo_main'])
         common['photos'].insert(0, common['photo_main'])
     max_photos = current_app.config.get('MAX_PHOTOS', 6)
-    if not common['photos']:
-        errors['photos'] = "Gardez au moins une photo."
-    elif len(common['photos']) > max_photos:
+    total = len(common['photos']) + len(common['photos_new'])
+    if not total:
+        errors['photos'] = "Gardez ou ajoutez au moins une photo."
+    elif total > max_photos:
         errors['photos'] = f"{max_photos} photos maximum : supprimez-en."
 
     own = {}
@@ -179,6 +184,26 @@ def parse_form(form, group):
                 errors[prefix + field] = "Choisissez une valeur."
 
     return common, own, errors
+
+
+def save_new_photos(group, common, own, folder):
+    """
+    Enregistre les photos ajoutées et complète common['photos'] (ajoutées après les photos gardées, sauf si
+    l'une d'elles est la principale). Nommées comme à la création, d'après le premier chat de l'annonce.
+    Retourne les chemins écrits (à supprimer si l'enregistrement échoue) ; lève PhotoError.
+    """
+    if not common['photos_new']:
+        return []
+    first = editable_cats(group)[0]
+    names = photos.save_photos(common['photos_new'], folder, own[first.id]['name'] or first.name, first.uuid)
+    main = common['photo_main']
+    if main.startswith('new:') and main[4:].isdigit() and int(main[4:]) < len(names):
+        main_name = names.pop(int(main[4:]))
+        common['photos'] = [main_name] + common['photos'] + names
+        names.insert(0, main_name)
+    else:
+        common['photos'] = common['photos'] + names
+    return [os.path.join(folder, n) for n in names]
 
 
 def apply_values(group, common, own):
