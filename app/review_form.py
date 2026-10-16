@@ -15,13 +15,16 @@ from datetime import date
 from flask import current_app
 from app import photos
 
-# Champs oui / non : (nom, libellé, [(valeur formulaire, libellé), ...]).
+# Champs à choix : (nom, libellé, [(valeur formulaire, libellé), ...]).
 # Entente et extérieur acceptent "Inconnu" (l'association peut ne pas savoir) ; FIV / FeLV sont obligatoires.
-COMMON_BOOL = [
+# Les champs oui / non sont des booléens en base ; l'accès extérieur est un ENUM (valeur formulaire = valeur en base).
+COMMON_CHOICES = [
     ('good_with_cats', "Entente avec les chats", [('1', "Sociable"), ('0', "Non souhaité"), ('', "Inconnu")]),
     ('good_with_children', "Entente avec les enfants", [('1', "Sociable"), ('0', "Non recommandé"), ('', "Inconnu")]),
-    ('outdoor_access', "Accès extérieur", [('1', "Nécessaire"), ('0', "Vie en intérieur"), ('', "Inconnu")]),
+    ('outdoor_access', "Accès extérieur", [('INDOOR', "Intérieur uniquement"), ('OPTIONAL', "Sortie possible"),
+                                           ('REQUIRED', "Sortie nécessaire"), ('', "Inconnu")]),
 ]
+ENUM_FIELDS = {'outdoor_access'}
 OWN_BOOL = [
     ('fiv', "Test FIV", [('0', "Négatif"), ('1', "Positif")]),
     ('felv', "Test FeLV", [('0', "Négatif"), ('1', "Positif")]),
@@ -30,7 +33,7 @@ SEX_CHOICES = [('MALE', "Mâle"), ('FEMALE', "Femelle")]
 # Annonce de plusieurs chats uniquement
 MODE_CHOICES = [('TOGETHER', "À adopter ensemble"), ('SEPARATE', "Adoptables séparément")]
 
-COMMON_LABELS = dict([(f, l) for f, l, _ in COMMON_BOOL] + [('description', "Description"), ('photos', "Photos"),
+COMMON_LABELS = dict([(f, l) for f, l, _ in COMMON_CHOICES] + [('description', "Description"), ('photos', "Photos"),
                                                              ('adoption_mode', "Mode d'adoption")])
 
 
@@ -42,6 +45,16 @@ def bool_to_form(value):
 def form_to_bool(raw):
     """'1' -> True, '0' -> False, '' -> None (non connu)."""
     return {'1': True, '0': False}.get(raw)
+
+
+def value_to_form(field, value):
+    """Valeur en base -> valeur du formulaire d'un champ commun ('' si inconnu)."""
+    return (value or '') if field in ENUM_FIELDS else bool_to_form(value)
+
+
+def form_to_value(field, raw):
+    """Valeur du formulaire -> valeur en base d'un champ commun (None si inconnu)."""
+    return (raw or None) if field in ENUM_FIELDS else form_to_bool(raw)
 
 
 def editable_cats(group):
@@ -77,7 +90,7 @@ def initial_values(group):
     """
     cats = editable_cats(group)
     ref = cats[0]
-    common = {f: bool_to_form(getattr(ref, f)) for f, _, _ in COMMON_BOOL}
+    common = {f: value_to_form(f, getattr(ref, f)) for f, _, _ in COMMON_CHOICES}
     common['description'] = ref.description or ''
     common['adoption_mode'] = ref.adoption_mode or 'TOGETHER'
     common['photos_delete'] = []
@@ -85,7 +98,7 @@ def initial_values(group):
     common['photo_main'] = ref_photos[0] if ref_photos else ''
 
     differences = []
-    for field in [f for f, _, _ in COMMON_BOOL] + ['description', 'photos', 'adoption_mode']:
+    for field in [f for f, _, _ in COMMON_CHOICES] + ['description', 'photos', 'adoption_mode']:
         if len({repr(getattr(c, field) or None) for c in cats}) > 1:
             differences.append(COMMON_LABELS[field])
 
@@ -112,7 +125,7 @@ def parse_form(form, files, group):
     cats = editable_cats(group)
 
     common = {}
-    for field, label, choices in COMMON_BOOL:
+    for field, label, choices in COMMON_CHOICES:
         common[field] = form.get(field, '')
         if common[field] not in [v for v, _ in choices]:
             errors[field] = "Choisissez une valeur."
@@ -209,8 +222,8 @@ def save_new_photos(group, common, own, folder):
 def apply_values(group, common, own):
     """Écrit les valeurs validées dans les chats modifiables du groupe (sans commit)."""
     for c in editable_cats(group):
-        for field, _, _ in COMMON_BOOL:
-            setattr(c, field, form_to_bool(common[field]))
+        for field, _, _ in COMMON_CHOICES:
+            setattr(c, field, form_to_value(field, common[field]))
         c.description = common['description']
         c.adoption_mode = common['adoption_mode']
         c.photos = list(common['photos'])

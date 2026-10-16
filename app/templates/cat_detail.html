@@ -19,6 +19,13 @@
   {% elif value is sameas false %}<span class="status-tag {{ no_class }}">{{ no }}</span>
   {% else %}<span class="status-tag tag-unknown">Inconnu</span>{% endif %}
 {% endmacro %}
+{# Accès extérieur : seule la sortie nécessaire est en orange (contrainte pour l'adoptant) #}
+{% macro outdoor_tag(value) %}
+  {% if value == 'INDOOR' %}<span class="status-tag tag-yes">Intérieur uniquement</span>
+  {% elif value == 'OPTIONAL' %}<span class="status-tag tag-yes">Sortie possible</span>
+  {% elif value == 'REQUIRED' %}<span class="status-tag tag-warning">Sortie nécessaire</span>
+  {% else %}<span class="status-tag tag-unknown">Inconnu</span>{% endif %}
+{% endmacro %}
 {% macro spec_row(icon, title) %}
   <div class="spec-item">
     <span class="spec-icon">{{ icon }}</span>
@@ -184,7 +191,7 @@
           <div class="specs-list">
             {% call spec_row('🐱', 'Autres chats') %}{{ yes_no_tag(cat.good_with_cats, 'Sociable', 'Non souhaité') }}{% endcall %}
             {% call spec_row('👶', 'Enfants') %}{{ yes_no_tag(cat.good_with_children, 'Sociable', 'Non recommandé') }}{% endcall %}
-            {% call spec_row('🌳', 'Accès extérieur') %}{{ yes_no_tag(cat.outdoor_access, 'Nécessaire', 'Vie en intérieur', 'tag-neutral', 'tag-neutral') }}{% endcall %}
+            {% call spec_row('🌳', 'Accès extérieur') %}{{ outdoor_tag(cat.outdoor_access) }}{% endcall %}
           </div>
         </div>
 
