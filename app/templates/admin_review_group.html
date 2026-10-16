@@ -57,7 +57,7 @@
 </div>
 {% endif %}
 
-<form method="POST" class="review-form" novalidate>
+<form method="POST" class="review-form" enctype="multipart/form-data" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <!-- Champs communs -->
@@ -90,9 +90,8 @@
     </div>
 
     <div class="form-field">
-      <span class="form-label">Photos</span>
-      {% if available_photos %}
-      <input type="hidden" name="photo_main" id="photoMain" value="{{ available_photos[0] }}">
+      <span class="form-label">Photos <span class="form-label-hint">({{ max_photos }} maximum)</span></span>
+      <input type="hidden" name="photo_main" id="photoMain" value="{{ available_photos[0] if available_photos }}">
       <div class="photo-pick-grid" id="photoGrid">
         {% for photo in available_photos %}
         {% set marked = photo in common.photos_delete %}
@@ -112,11 +111,14 @@
         Cliquez sur une photo pour en faire la photo principale (affichée en premier sur le site).
         Les photos marquées ✕ seront définitivement supprimées (fichier effacé du serveur) à l'enregistrement ;
         d'ici là, « Annuler » permet de les garder.
+        Les photos ajoutées sont réduites automatiquement avant l'envoi, et les informations qu'elles contiennent
+        (dont la position GPS) sont supprimées.
       </p>
-      {% else %}
-      <p class="form-hint">Aucune photo.</p>
-      {% endif %}
+      <label class="form-label photo-add-label" for="photosNew">Ajouter des photos</label>
+      <input class="form-input" type="file" id="photosNew" name="photos_new" accept="image/jpeg,image/png,image/webp" multiple>
+      <p class="field-error" id="photoAddError"></p>
       {% if errors.photos %}<p class="field-error">{{ errors.photos }}</p>{% endif %}
+      {% if new_photos_lost %}<p class="field-error">Les photos ajoutées sont à sélectionner de nouveau.</p>{% endif %}
     </div>
   </section>
 
@@ -174,39 +176,122 @@
 
 <script>
   (() => {
+    const MAX_PHOTOS = {{ max_photos }};
+    const MAX_SIDE = 1600;
     const grid = document.getElementById('photoGrid');
     const mainInput = document.getElementById('photoMain');
-    if (!grid) return;
+    const input = document.getElementById('photosNew');
+    const errorBox = document.getElementById('photoAddError');
+    const submitButtons = document.querySelectorAll('.form-actions button[type="submit"]');
+    let added = [];      // photos ajoutées : [{file, url}], dans l'ordre d'envoi
+    let main = grid.querySelector('.photo-pick.is-main') || null;   // carte de la photo principale
 
-    // Photo principale : placée en premier, avec le badge "Principale"
+    // Photo principale : placée en premier, avec le badge "Principale".
+    // Photo existante : son nom de fichier ; photo ajoutée : 'new:<rang>'.
     function setMain(card) {
+      main = card;
       grid.querySelectorAll('.photo-pick').forEach((c) => c.classList.remove('is-main'));
       if (!card) { mainInput.value = ''; return; }
       card.classList.add('is-main');
       grid.prepend(card);
-      mainInput.value = card.dataset.photo;
+      mainInput.value = card.dataset.photo || 'new:' + added.indexOf(card.addedPhoto);
     }
 
-    grid.querySelectorAll('.photo-pick').forEach((card) => {
+    function firstKept() {
+      return grid.querySelector('.photo-pick:not(.is-deleted)');
+    }
+
+    function keptCount() {
+      return grid.querySelectorAll('.photo-pick[data-photo]:not(.is-deleted)').length;
+    }
+
+    grid.querySelectorAll('.photo-pick[data-photo]').forEach((card) => {
       // Clic sur une photo (non marquée pour suppression) : elle devient la principale
       card.querySelector('img').addEventListener('click', () => {
         if (!card.classList.contains('is-deleted')) setMain(card);
       });
     });
 
-    // Marque / démarque une photo pour suppression (appliquée à l'enregistrement)
-    document.querySelectorAll('.photo-pick-delete, .photo-pick-undo').forEach((btn) => {
+    // Marque / démarque une photo existante pour suppression (appliquée à l'enregistrement)
+    grid.querySelectorAll('.photo-pick-delete, .photo-pick-undo').forEach((btn) => {
       btn.addEventListener('click', () => {
         const card = btn.closest('.photo-pick');
         const marked = card.classList.toggle('is-deleted');
         card.querySelector('input[name="photos_delete"]').disabled = !marked;
         // La principale est marquée : la première photo conservée prend sa place
-        if (marked && card.classList.contains('is-main')) {
-          setMain(grid.querySelector('.photo-pick:not(.is-deleted)'));
-        } else if (!marked && !mainInput.value) {
+        if (marked && card === main) {
+          setMain(firstKept());
+        } else if (!marked && !main) {
           setMain(card);
         }
       });
+    });
+
+    // Photos ajoutées : réduites dans le navigateur avant l'envoi (plus grand côté 1600 px, JPEG), avec aperçu.
+    // Le serveur les traite de nouveau (Pillow) ; ceci ne sert qu'à alléger l'envoi.
+    if (typeof DataTransfer === 'undefined' || typeof createImageBitmap === 'undefined') return;  // ancien navigateur : envoi simple
+
+    async function shrink(file) {
+      try {
+        const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(bitmap.width * scale);
+        canvas.height = Math.round(bitmap.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+        if (!blob) return file;
+        return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+      } catch (e) {
+        return file;  // illisible par le navigateur : envoyée telle quelle, le serveur la vérifiera
+      }
+    }
+
+    // Recrée les cartes des photos ajoutées et le contenu du champ fichier
+    function sync() {
+      const dt = new DataTransfer();
+      added.forEach((a) => dt.items.add(a.file));
+      input.files = dt.files;
+
+      grid.querySelectorAll('.photo-pick.is-new').forEach((c) => c.remove());
+      const mainPhoto = main && main.addedPhoto;
+      let newMain = null;
+      added.forEach((a) => {
+        const card = document.createElement('div');
+        card.className = 'photo-pick is-new';
+        card.addedPhoto = a;
+        card.innerHTML = '<img alt="Nouvelle photo" title="Définir comme photo principale">'
+          + '<span class="photo-pick-main">Principale</span><span class="photo-pick-new">Nouvelle</span>'
+          + '<button type="button" class="photo-pick-delete" title="Retirer cette photo" aria-label="Retirer cette photo">✕</button>';
+        card.querySelector('img').src = a.url;
+        card.querySelector('img').addEventListener('click', () => setMain(card));
+        card.querySelector('button').addEventListener('click', () => {
+          URL.revokeObjectURL(a.url);
+          added.splice(added.indexOf(a), 1);
+          sync();
+        });
+        grid.appendChild(card);
+        if (a === mainPhoto) newMain = card;
+      });
+      if (main && main.addedPhoto) main = newMain;   // la principale était une photo ajoutée
+      setMain(main && !main.classList.contains('is-deleted') ? main : firstKept());
+    }
+
+    input.addEventListener('change', async () => {
+      const files = [...input.files].filter((f) => !added.some((a) => a.file === f));
+      const free = Math.max(0, MAX_PHOTOS - keptCount() - added.length);
+      errorBox.textContent = files.length > free
+        ? MAX_PHOTOS + ' photos maximum : les photos en trop ont été ignorées.' : '';
+      submitButtons.forEach((b) => { b.disabled = true; });
+      for (const file of files.slice(0, free)) {
+        const small = await shrink(file);
+        added.push({ file: small, url: URL.createObjectURL(small) });
+      }
+      submitButtons.forEach((b) => { b.disabled = false; });
+      sync();
     });
   })();
 </script>
