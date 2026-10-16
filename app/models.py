@@ -47,7 +47,8 @@ class AdoptionCat(db.Model):
     # Entente et environnement
     good_with_cats = db.Column(db.Boolean, nullable=True)
     good_with_children = db.Column(db.Boolean, nullable=True)
-    outdoor_access = db.Column(db.Boolean, nullable=True)
+    # Intérieur uniquement / sortie possible / sortie nécessaire ; NULL = inconnu
+    outdoor_access = db.Column(db.Enum('INDOOR', 'OPTIONAL', 'REQUIRED', name='outdoor_access_enum'), nullable=True)
 
     # Santé
     fiv = db.Column(db.Boolean, nullable=False)

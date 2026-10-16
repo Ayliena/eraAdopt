@@ -115,9 +115,10 @@ def index():
         if good_with_children == '1':
             query = query.filter(AdoptionCat.good_with_children.is_(True))
 
-        # 3. Filtre accès extérieur (si coché: pas d'extérieur au foyer, donc on cache les chats qui en ont besoin)
+        # 3. Filtre accès extérieur (si coché: pas d'extérieur au foyer, donc on cache les chats qui en ont besoin ;
+        #    intérieur uniquement, sortie possible et inconnu restent affichés)
         if no_outdoor == '1':
-            query = query.filter(AdoptionCat.outdoor_access.isnot(True))
+            query = query.filter(db.or_(AdoptionCat.outdoor_access.is_(None), AdoptionCat.outdoor_access != 'REQUIRED'))
 
         # 4. Filtre adoption seul / à plusieurs : "peut-on n'adopter qu'un seul chat ?"
         #    - à plusieurs (1) : annonces de plusieurs chats à adopter ensemble uniquement

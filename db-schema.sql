@@ -26,7 +26,7 @@ CREATE TABLE `adoption_cats` (
   -- Entente et environnement (booléens: 1 = oui, 0 = non, NULL = inconnu)
   `good_with_cats` TINYINT(1) DEFAULT NULL COMMENT 'Vie avec d\'autres chats',
   `good_with_children` TINYINT(1) DEFAULT NULL COMMENT 'Vie avec des enfants',
-  `outdoor_access` TINYINT(1) DEFAULT NULL COMMENT 'Accès à un extérieur nécessaire/souhaité',
+  `outdoor_access` ENUM('INDOOR', 'OPTIONAL', 'REQUIRED') DEFAULT NULL COMMENT 'Accès extérieur : intérieur uniquement (INDOOR), sortie possible (OPTIONAL), sortie nécessaire (REQUIRED) ; NULL = inconnu',
 
   -- Santé (booléens: 1 = positif, 0 = négatif ; le test est toujours fait avant la mise à l'adoption)
   `fiv` TINYINT(1) NOT NULL COMMENT 'Test FIV (1=positif, 0=négatif)',

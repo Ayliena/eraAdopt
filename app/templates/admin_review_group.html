@@ -75,7 +75,7 @@
     {% endif %}
 
     <div class="form-grid">
-      {% for field, label, choices in form.COMMON_BOOL %}
+      {% for field, label, choices in form.COMMON_CHOICES %}
       <div class="form-field">
         <span class="form-label">{{ label }}</span>
         {{ seg(field, choices, common[field], errors.get(field)) }}
