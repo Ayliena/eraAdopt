@@ -17,14 +17,16 @@ from app import photos
 
 # Champs à choix : (nom, libellé, [(valeur formulaire, libellé), ...]).
 # Entente et extérieur acceptent "Inconnu" (l'association peut ne pas savoir) ; FIV / FeLV sont obligatoires.
-# Les champs oui / non sont des booléens en base ; l'accès extérieur est un ENUM (valeur formulaire = valeur en base).
+# Entente avec les enfants est un booléen en base ; autres chats et accès extérieur sont des ENUM
+# (valeur formulaire = valeur en base).
 COMMON_CHOICES = [
-    ('good_with_cats', "Entente avec les chats", [('1', "Sociable"), ('0', "Non souhaité"), ('', "Inconnu")]),
+    ('good_with_cats', "Vie avec d'autres chats", [('NONE', "Sans autres chats"), ('OK', "Autres chats OK"),
+                                                   ('REQUIRED', "Autres chats nécessaires"), ('', "Inconnu")]),
     ('good_with_children', "Entente avec les enfants", [('1', "Sociable"), ('0', "Non recommandé"), ('', "Inconnu")]),
     ('outdoor_access', "Accès extérieur", [('INDOOR', "Intérieur uniquement"), ('OPTIONAL', "Sortie possible"),
                                            ('REQUIRED', "Sortie nécessaire"), ('', "Inconnu")]),
 ]
-ENUM_FIELDS = {'outdoor_access'}
+ENUM_FIELDS = {'good_with_cats', 'outdoor_access'}
 OWN_BOOL = [
     ('fiv', "Test FIV", [('0', "Négatif"), ('1', "Positif")]),
     ('felv', "Test FeLV", [('0', "Négatif"), ('1', "Positif")]),

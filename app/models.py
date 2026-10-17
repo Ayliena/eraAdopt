@@ -45,7 +45,8 @@ class AdoptionCat(db.Model):
     breed = db.Column(db.String(100), default='Européen', nullable=False)
 
     # Entente et environnement
-    good_with_cats = db.Column(db.Boolean, nullable=True)
+    # Sans autres chats / autres chats OK / autres chats nécessaires ; NULL = inconnu
+    good_with_cats = db.Column(db.Enum('NONE', 'OK', 'REQUIRED', name='good_with_cats_enum'), nullable=True)
     good_with_children = db.Column(db.Boolean, nullable=True)
     # Intérieur uniquement / sortie possible / sortie nécessaire ; NULL = inconnu
     outdoor_access = db.Column(db.Enum('INDOOR', 'OPTIONAL', 'REQUIRED', name='outdoor_access_enum'), nullable=True)

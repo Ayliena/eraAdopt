@@ -34,7 +34,7 @@ TRIO_PHOTOS = ["Titi_Toto_Tutu_bec30e09_1.png", "Titi_Toto_Tutu_bec30e09_2.png",
 TRIO_UUIDS = ["bec30e09-342e-4618-9384-c5590b0e9348", "85552ce0-829d-4839-a875-0b7cd1be4dbb",
               "e912a0a8-a794-441f-8915-db4d1196ab0a"]
 
-ENTENTE_OK = dict(good_with_cats=True, good_with_children=True, outdoor_access='INDOOR', fiv=False, felv=False)
+ENTENTE_OK = dict(good_with_cats='OK', good_with_children=True, outdoor_access='INDOOR', fiv=False, felv=False)
 # Fiches en attente : entente à renseigner lors de la validation (FIV / FeLV obligatoires, négatifs par défaut)
 A_RENSEIGNER = dict(good_with_cats=None, good_with_children=None, outdoor_access=None, fiv=False, felv=False)
 
@@ -54,7 +54,7 @@ SEED_CATS = [
          created_by=TEST_CREATOR, created_at=datetime(2026, 9, 21, 1, 38, 47)),
     dict(uuid="9d367269-07ea-4ad4-9f5b-ddae14a420d3", cat_id=-3, status="ACCEPTED", name="Simba", sex="MALE",
          birthdate=date(2022, 6, 10), breed="Croisé roux",
-         good_with_cats=True, good_with_children=False, outdoor_access='REQUIRED', fiv=False, felv=False,
+         good_with_cats='OK', good_with_children=False, outdoor_access='REQUIRED', fiv=False, felv=False,
          description="Grand explorateur calme et indépendant. Un jardin sera nécessaire pour son épanouissement.",
          photos=["Simba_9d367269_1.png"], linked_cats=None, created_by=TEST_CREATOR, created_at=datetime(2026, 9, 21, 1, 38, 47)),
     dict(uuid="3b914adc-1fd0-409a-a2da-c8183dcdb428", cat_id=6743, status="ACCEPTED", name="DATHEA", sex="FEMALE",
@@ -67,7 +67,7 @@ SEED_CATS = [
          created_by=125, created_at=datetime(2026, 10, 4, 23, 8, 38)),
     dict(uuid="4eeb31b9-1a6e-46f9-812a-a5e07cba6e9a", cat_id=6741, status="ACCEPTED", name="CHAT TEST 1", sex="MALE",
          birthdate=date(2020, 12, 21), breed="Européen",
-         good_with_cats=False, good_with_children=False, outdoor_access='REQUIRED', fiv=False, felv=False,
+         good_with_cats='NONE', good_with_children=False, outdoor_access='REQUIRED', fiv=False, felv=False,
          description="Un chat pas commode...", photos=["CHAT_TEST_1_4eeb31b9_1.jpg"], linked_cats=None,
          created_by=125, created_at=datetime(2026, 10, 4, 23, 27, 47)),
     dict(uuid="36e050aa-1f66-4196-9b0f-35741c066185", cat_id=7342, status="ACCEPTED", name="KYPROSA", sex="FEMALE",
