@@ -24,7 +24,7 @@ CREATE TABLE `adoption_cats` (
   `breed` VARCHAR(100) NOT NULL DEFAULT 'Européen' COMMENT 'Race du chat',
 
   -- Entente et environnement (booléens: 1 = oui, 0 = non, NULL = inconnu)
-  `good_with_cats` TINYINT(1) DEFAULT NULL COMMENT 'Vie avec d\'autres chats',
+  `good_with_cats` ENUM('NONE', 'OK', 'REQUIRED') DEFAULT NULL COMMENT 'Vie avec d\'autres chats : sans autres chats (NONE), autres chats OK (OK), autres chats nécessaires (REQUIRED) ; NULL = inconnu',
   `good_with_children` TINYINT(1) DEFAULT NULL COMMENT 'Vie avec des enfants',
   `outdoor_access` ENUM('INDOOR', 'OPTIONAL', 'REQUIRED') DEFAULT NULL COMMENT 'Accès extérieur : intérieur uniquement (INDOOR), sortie possible (OPTIONAL), sortie nécessaire (REQUIRED) ; NULL = inconnu',
 

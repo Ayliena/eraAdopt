@@ -109,7 +109,7 @@ def index():
 
         # 1. Filtre entente chats (si coché: le foyer a des chats, donc le chat doit être sociable chats)
         if good_with_cats == '1':
-            query = query.filter(AdoptionCat.good_with_cats.is_(True))
+            query = query.filter(AdoptionCat.good_with_cats.in_(['OK', 'REQUIRED']))
 
         # 2. Filtre entente enfants (si coché: le foyer a des enfants, donc le chat doit être ok enfants)
         if good_with_children == '1':
