@@ -3,7 +3,7 @@ Formulaire de validation ou de modification d'une annonce (un chat seul ou plusi
 
 Champs communs (identiques pour tous les chats d'une annonce, car ils rejoignent le même foyer
 et partagent description et photos) : good_with_cats, good_with_children, outdoor_access, description, photos.
-Champs propres à chaque chat : name, sex, birthdate, breed, fiv, felv.
+Champs propres à chaque chat : name, sex, birthdate, breed, color, fiv, felv.
 
 Seuls les chats du statut traité (group.main_status) sont modifiés : en validation, un éventuel chat
 déjà ACCEPTED lié à l'annonce n'est pas touché.
@@ -111,6 +111,7 @@ def initial_values(group):
             'sex': c.sex or '',
             'birthdate': c.birthdate.isoformat() if c.birthdate else '',
             'breed': c.breed or '',
+            'color': c.color or '',
             'fiv': bool_to_form(c.fiv),
             'felv': bool_to_form(c.felv),
         }
@@ -170,6 +171,7 @@ def parse_form(form, files, group):
             'sex': form.get(prefix + 'sex', ''),
             'birthdate': form.get(prefix + 'birthdate', '').strip(),
             'breed': form.get(prefix + 'breed', '').strip(),
+            'color': form.get(prefix + 'color', '').strip(),
             'fiv': form.get(prefix + 'fiv', ''),
             'felv': form.get(prefix + 'felv', ''),
         }
@@ -194,6 +196,10 @@ def parse_form(form, files, group):
                 errors[prefix + 'birthdate'] = "Date invalide."
         if len(values['breed']) > 100:
             errors[prefix + 'breed'] = "100 caractères maximum."
+        if not values['color']:
+            errors[prefix + 'color'] = "La couleur est obligatoire."
+        elif len(values['color']) > 64:
+            errors[prefix + 'color'] = "64 caractères maximum."
         for field, _, choices in OWN_BOOL:
             if values[field] not in [v for v, _ in choices]:
                 errors[prefix + field] = "Choisissez une valeur."
@@ -235,6 +241,7 @@ def apply_values(group, common, own):
         c.sex = values['sex']
         c.birthdate = date.fromisoformat(values['birthdate']) if values['birthdate'] else None
         c.breed = values['breed'] or 'Européen'
+        c.color = values['color']
         c.fiv = form_to_bool(values['fiv'])
         c.felv = form_to_bool(values['felv'])
 

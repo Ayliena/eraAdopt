@@ -22,6 +22,7 @@ CREATE TABLE `adoption_cats` (
   `sex` ENUM('MALE', 'FEMALE') NOT NULL,
   `birthdate` DATE NOT NULL COMMENT 'Date de naissance (estimée ou réelle) pour calculer l\'âge',
   `breed` VARCHAR(100) NOT NULL DEFAULT 'Européen' COMMENT 'Race du chat',
+  `color` VARCHAR(64) NOT NULL COMMENT 'Couleur et type de poil (texte issu d\'eraFA à la création, ex. « Tigré, poil long »)',
 
   -- Entente et environnement (booléens: 1 = oui, 0 = non, NULL = inconnu)
   `good_with_cats` ENUM('NONE', 'OK', 'REQUIRED') DEFAULT NULL COMMENT 'Vie avec d\'autres chats : sans autres chats (NONE), autres chats OK (OK), autres chats nécessaires (REQUIRED) ; NULL = inconnu',

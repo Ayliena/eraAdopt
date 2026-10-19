@@ -148,6 +148,11 @@
         <input id="{{ p }}breed" name="{{ p }}breed" value="{{ v.breed }}" maxlength="100" class="form-input" placeholder="Européen">
         {% if errors.get(p ~ 'breed') %}<p class="field-error">{{ errors.get(p ~ 'breed') }}</p>{% endif %}
       </div>
+      <div class="form-field">
+        <label class="form-label" for="{{ p }}color">Couleur <span class="form-label-hint">(reprise d'eraFA, ex. « Tigré, poil long »)</span></label>
+        <input id="{{ p }}color" name="{{ p }}color" value="{{ v.color }}" maxlength="64" class="form-input">
+        {% if errors.get(p ~ 'color') %}<p class="field-error">{{ errors.get(p ~ 'color') }}</p>{% endif %}
+      </div>
       {% for field, label, choices in form.OWN_BOOL %}
       <div class="form-field">
         <span class="form-label">{{ label }}</span>

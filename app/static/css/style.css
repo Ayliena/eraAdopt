@@ -975,6 +975,11 @@ main {
 }
 
 
+/* Texte qui ne se coupe qu'entre ses morceaux (couleur : après la virgule) */
+.nowrap {
+  white-space: nowrap;
+}
+
 /* Résultats FIV / FeLV sur une seule ligne */
 .tests-pair {
   display: inline-flex;
