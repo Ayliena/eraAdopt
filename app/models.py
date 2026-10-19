@@ -43,6 +43,8 @@ class AdoptionCat(db.Model):
     sex = db.Column(db.Enum('MALE', 'FEMALE', name='cat_sex_enum'), nullable=False)
     birthdate = db.Column(db.Date, nullable=False)
     breed = db.Column(db.String(100), default='Européen', nullable=False)
+    # Couleur et type de poil, texte repris d'eraFA à la création (ex. 'Tigré, poil long'), modifiable par les admins
+    color = db.Column(db.String(64), nullable=False)
 
     # Entente et environnement
     # Sans autres chats / autres chats OK / autres chats nécessaires ; NULL = inconnu
@@ -171,6 +173,7 @@ class AdoptionCat(db.Model):
             'birthdate': self.birthdate.isoformat() if self.birthdate else None,
             'age': self.age_years_months,
             'breed': self.breed,
+            'color': self.color,
             'status': self.status,
             'good_with_cats': self.good_with_cats,
             'good_with_children': self.good_with_children,

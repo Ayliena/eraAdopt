@@ -33,6 +33,8 @@
   {% elif value == 'REQUIRED' %}<span class="status-tag tag-warning">Autres chats nécessaires</span>
   {% else %}<span class="status-tag tag-unknown">Inconnu</span>{% endif %}
 {% endmacro %}
+{# Couleur : retour à la ligne seulement après une virgule ('Noir plastron blanc,' / 'poil mi-long') #}
+{% macro color_text(value) %}{% for part in (value or '').split(', ') %}<span class="nowrap">{{ part }}{{ ',' if not loop.last }}</span>{{ ' ' if not loop.last }}{% endfor %}{% endmacro %}
 {% macro spec_row(icon, title) %}
   <div class="spec-item">
     <span class="spec-icon">{{ icon }}</span>
@@ -157,6 +159,12 @@
               <span class="pill-label">Race</span>
               <span class="pill-val">{{ cat.breed or 'Européen' }}</span>
             </div>
+            {% if cat.color %}
+            <div class="meta-pill">
+              <span class="pill-label">Couleur</span>
+              <span class="pill-val">{{ color_text(cat.color) }}</span>
+            </div>
+            {% endif %}
           </div>
           {% endif %}
         </div>
@@ -175,6 +183,7 @@
               <dl class="group-cat-specs">
                 <div><dt>Âge</dt><dd>{{ c.age_years_months }}</dd></div>
                 <div><dt>Race</dt><dd>{{ c.breed or 'Européen' }}</dd></div>
+                {% if c.color %}<div><dt>Couleur</dt><dd>{{ color_text(c.color) }}</dd></div>{% endif %}
                 <div><dt>FIV / FeLV</dt><dd>{{ tests_tags(c) }}</dd></div>
               </dl>
             </div>
