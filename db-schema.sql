@@ -36,7 +36,7 @@ CREATE TABLE `adoption_cats` (
   -- Description libre
   `description` TEXT NOT NULL COMMENT 'Historique, caractère, comportement, etc.',
 
-  -- Photos (tableau JSON des noms de fichiers, de 1 à 6 photos ; la première est la photo principale)
+  -- Photos (tableau JSON des noms de fichiers, de 1 à 8 photos ; la première est la photo principale)
   `photos` JSON NOT NULL COMMENT 'Tableau JSON des noms de fichiers des photos, 1 à 6',
 
   -- Chats liés (liste d'UUIDs au format JSON, ex: ["uuid-1", "uuid-2"] ; NULL = chat seul)
@@ -58,7 +58,7 @@ CREATE TABLE `adoption_cats` (
   KEY `idx_adoption_cats_status` (`status`),
   KEY `idx_adoption_cats_name` (`name`),
   KEY `idx_adoption_cats_created_by` (`created_by`),
-  CONSTRAINT `chk_photos_limit` CHECK (JSON_LENGTH(`photos`) BETWEEN 1 AND 6)
+  CONSTRAINT `chk_photos_limit` CHECK (JSON_LENGTH(`photos`) BETWEEN 1 AND 8)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

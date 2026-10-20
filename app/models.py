@@ -62,7 +62,7 @@ class AdoptionCat(db.Model):
 
     # Photos et relations (JSON)
     # none_as_null : None est stocké en NULL SQL et non en valeur JSON 'null'
-    photos = db.Column(db.JSON(none_as_null=True), nullable=False)  # 1 à 6 photos
+    photos = db.Column(db.JSON(none_as_null=True), nullable=False)  # 1 à 8 photos
     linked_cats = db.Column(db.JSON(none_as_null=True), nullable=True)
     # Annonce de plusieurs chats : à adopter ensemble (TOGETHER) ou séparément (SEPARATE) ; ignoré pour un chat seul
     adoption_mode = db.Column(db.Enum('TOGETHER', 'SEPARATE', name='adoption_mode_enum'), default='TOGETHER', nullable=False)

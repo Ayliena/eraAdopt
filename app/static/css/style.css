@@ -693,7 +693,7 @@ main {
 
 /* Miniatures */
 .thumbnail-strip {
-  /* Jusqu'à 6 miniatures, toujours sur une ligne quelle que soit la largeur */
+  /* 6 miniatures par ligne quelle que soit la largeur (au-delà, deuxième ligne) */
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;

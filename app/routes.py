@@ -334,7 +334,7 @@ def group_form_page(group, mode):
         saved=request.args.get('enregistre') == '1' and request.method == 'GET',
         photo_errors=request.args.get('photos_erreur', 0, type=int) if request.method == 'GET' else 0,
         new_photos_lost=bool(errors and common.get('photos_new')),
-        max_photos=app.config.get('MAX_PHOTOS', 6),
+        max_photos=app.config.get('MAX_PHOTOS', 8),
         form=review_form,
     )
 
