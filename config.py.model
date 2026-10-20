@@ -10,7 +10,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(BASE_DIR), 'uploads', 'eraAdopt'))
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
 # Nombre de photos max par annonce
-MAX_PHOTOS = 6
+MAX_PHOTOS = 8
 # Taille max d'une requête, refusée avant traitement (photos réduites dans le navigateur avant envoi :
 # quelques centaines de Ko chacune, cette limite n'est qu'un garde-fou)
 MAX_CONTENT_LENGTH = 20 * 1024 * 1024  # 20 MB

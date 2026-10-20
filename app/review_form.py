@@ -156,7 +156,7 @@ def parse_form(form, files, group):
     if common['photo_main'] in common['photos']:
         common['photos'].remove(common['photo_main'])
         common['photos'].insert(0, common['photo_main'])
-    max_photos = current_app.config.get('MAX_PHOTOS', 6)
+    max_photos = current_app.config.get('MAX_PHOTOS', 8)
     total = len(common['photos']) + len(common['photos_new'])
     if not total:
         errors['photos'] = "Gardez ou ajoutez au moins une photo."
