@@ -1,0 +1,84 @@
+{% extends 'admin_base.html' %}
+
+{% block title %}Publication Facebook{% endblock %}
+
+{% block content %}
+<div class="admin-title-row">
+  <h1>Publication Facebook</h1>
+</div>
+<p class="admin-subtitle">
+  Page de test de la publication sur Facebook : le texte saisi est publié tel quel sur la page configurée
+  pour ce site{% if config.DEVEL_SITE %} (site de développement : page Facebook de test){% endif %}.
+</p>
+
+{% if deleted %}
+<div class="admin-notice success">✓ Publication supprimée de Facebook.</div>
+{% endif %}
+{% if post %}
+<div class="admin-notice success">
+  ✓ Publié sur Facebook.
+  {% if post.link %}<a href="{{ post.link }}" target="_blank" rel="noopener">Voir la publication</a>{% endif %}
+  {% if post_error %}(lien indisponible : {{ post_error }}){% endif %}
+  <form method="POST" class="fb-inline-form"
+        data-confirm-icon="🗑" data-confirm-title="Supprimer la publication ?" data-confirm-ok="Supprimer"
+        data-confirm-danger="1" data-confirm-message="La publication sera définitivement supprimée de la page Facebook.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="delete">
+    <input type="hidden" name="post_id" value="{{ post.id }}">
+    <button type="submit" class="btn-dialog-secondary">Supprimer cette publication</button>
+  </form>
+</div>
+{% endif %}
+{% if error %}
+<div class="admin-notice error">⚠ {{ error }}</div>
+{% endif %}
+
+<!-- État de la configuration et du jeton -->
+<section class="info-card form-card">
+  <h2>Page visée</h2>
+  {% if not configured %}
+  <p class="form-hint">Facebook n'est pas configuré : ajoutez <code>FB_PAGE_ID</code> et <code>FB_PAGE_TOKEN</code> dans la config du site.</p>
+  {% elif status_error %}
+  <div class="admin-notice error">⚠ Impossible de vérifier la page ou le jeton : {{ status_error }}</div>
+  {% else %}
+  <dl class="fb-status">
+    <div><dt>Page</dt><dd>{% if page.link %}<a href="{{ page.link }}" target="_blank" rel="noopener">{{ page.name }}</a>{% else %}{{ page.name }}{% endif %} <span class="fb-muted">(ID {{ page.id }})</span></dd></div>
+    <div><dt>Jeton</dt><dd>
+      {% if token.is_valid %}<span class="status-tag tag-yes">Valide</span>{% else %}<span class="status-tag tag-warning">Non valide</span>{% endif %}
+      {% if token.type %}<span class="fb-muted">jeton {{ 'de page' if token.type == 'PAGE' else token.type }}</span>{% endif %}
+    </dd></div>
+    <div><dt>Expiration</dt><dd>
+      {% if token_expires %}<span class="status-tag tag-warning">le {{ token_expires }}</span>
+      {% else %}<span class="status-tag tag-yes">Jamais</span>{% endif %}
+    </dd></div>
+    {% if data_access_expires %}
+    <div><dt>Accès aux données</dt><dd>
+      jusqu'au {{ data_access_expires }}
+      <span class="fb-muted">(prolongé automatiquement par Meta tant que le compte qui a généré le jeton utilise l'app ; sinon, regénérer le jeton)</span>
+    </dd></div>
+    {% endif %}
+    {% if token.scopes %}
+    <div><dt>Droits</dt><dd class="fb-muted">{{ token.scopes|join(', ') }}</dd></div>
+    {% endif %}
+  </dl>
+  {% endif %}
+</section>
+
+<!-- Publication d'un texte libre -->
+{% if configured and not status_error %}
+<form method="POST" class="info-card form-card"
+      data-confirm-icon="📣" data-confirm-title="Publier sur Facebook ?" data-confirm-ok="Publier"
+      data-confirm-message="Le texte sera publié publiquement sur la page {{ page.name }}.">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="publish">
+  <h2>Publier un texte</h2>
+  <div class="form-field">
+    <label class="form-label" for="message">Texte de la publication</label>
+    <textarea id="message" name="message" rows="6" class="form-input" required>{{ message }}</textarea>
+  </div>
+  <div class="form-actions-inline">
+    <button type="submit" class="btn-dialog-primary">Publier sur Facebook</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

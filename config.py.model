@@ -45,3 +45,10 @@ SESSION_COOKIE_NAME = "session"
 
 # URL de eraFA (connexion / déconnexion)
 ERAFA_URL = "https://fa.association-era.org"
+
+# Publication Facebook (page de test en développement, page officielle d'ERA en production).
+# FB_PAGE_ID : identifiant de la page pour l'API (champ "id" renvoyé par /me/accounts, différent de l'id du lien profile.php)
+# FB_PAGE_TOKEN : jeton de page sans expiration, à ne jamais committer ni partager
+FB_PAGE_ID = ""
+FB_PAGE_TOKEN = ""
+FB_GRAPH_VERSION = "v26.0"

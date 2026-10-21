@@ -1963,3 +1963,43 @@ footer {
   }
 
 }
+
+/* Page de test de la publication Facebook */
+.fb-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fb-status > div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.fb-status dt {
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .fb-status > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+.fb-muted {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.fb-inline-form {
+  margin-top: 10px;
+}
+
+.form-actions-inline {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
