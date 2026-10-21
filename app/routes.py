@@ -1,5 +1,7 @@
 import os
+import re
 import shutil
+from datetime import datetime
 from functools import wraps
 from urllib.parse import quote
 from flask import render_template, jsonify, request, abort, redirect, url_for
@@ -9,7 +11,7 @@ from sqlalchemy.orm import aliased
 from app import app, db, login_manager
 from app.photos import PhotoError, remove_files
 from app.models import AdoptionCat, User, build_groups, build_review_groups, photo_public_url, join_names_fr
-from app import review_form
+from app import review_form, facebook
 from app.seed_data import SEED_CATS, COLOR_PHOTOS
 from app.helpers import slugify_name, build_contact_mailto, fold_text, MAIL_BODY_LINES
 
@@ -435,6 +437,70 @@ def admin_delete_listing(uuid):
     if status == 'ARCHIVED':
         extra['statut'] = 'archivees'
     return redirect(url_for('admin_listings', supprimee=names, **extra))
+
+def valid_post_id(post_id):
+    """Identifiant d'un post de la page configurée ('<page>_<post>') : jamais un autre objet Facebook."""
+    page_id = app.config.get('FB_PAGE_ID') or ''
+    return bool(page_id) and re.fullmatch(rf"{re.escape(page_id)}_\d+", post_id or '') is not None
+
+@app.route('/admin/facebook', methods=['GET', 'POST'])
+@admin_required
+def admin_facebook():
+    """
+    Test de la publication Facebook : état du jeton, publication d'un texte libre, suppression du post publié.
+    La page visée dépend de la configuration (page de test en développement).
+    """
+    error, message = None, ''
+    if request.method == 'POST':
+        try:
+            if request.form.get('action') == 'delete':
+                post_id = request.form.get('post_id', '')
+                if not valid_post_id(post_id):
+                    abort(400)
+                facebook.delete_post(post_id)
+                return redirect(url_for('admin_facebook', supprime=1))
+            message = request.form.get('message', '').strip()
+            if not message:
+                error = "Le texte est vide."
+            else:
+                post_id = facebook.publish_text(message)
+                return redirect(url_for('admin_facebook', post=post_id))
+        except facebook.FacebookError as e:
+            error = str(e)
+
+    page, token, status_error = None, None, None
+    if facebook.is_configured():
+        try:
+            page = facebook.page_info()
+            token = facebook.token_info()
+        except facebook.FacebookError as e:
+            status_error = str(e)
+
+    # Post qui vient d'être publié (identifiant passé dans l'URL, sans écrire dans la session partagée avec eraFA)
+    post_id = request.args.get('post', '')
+    post, post_error = None, None
+    if valid_post_id(post_id):
+        try:
+            post = {'id': post_id, 'link': facebook.post_link(post_id)}
+        except facebook.FacebookError as e:
+            post, post_error = {'id': post_id, 'link': None}, str(e)
+
+    return render_template(
+        'admin_facebook.html',
+        configured=facebook.is_configured(),
+        page=page,
+        token=token,
+        token_expires=(datetime.fromtimestamp(token['expires_at']).strftime('%d/%m/%Y')
+                       if token and token.get('expires_at') else None),
+        data_access_expires=(datetime.fromtimestamp(token['data_access_expires_at']).strftime('%d/%m/%Y')
+                             if token and token.get('data_access_expires_at') else None),
+        status_error=status_error,
+        post=post,
+        post_error=post_error,
+        deleted=request.args.get('supprime') == '1',
+        error=error,
+        message=message,
+    )
 
 @app.route('/test-db')
 @dev_only
