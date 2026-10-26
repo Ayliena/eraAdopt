@@ -37,7 +37,7 @@ CREATE TABLE `adoption_cats` (
   `description` TEXT NOT NULL COMMENT 'Historique, caractère, comportement, etc.',
 
   -- Photos (tableau JSON des noms de fichiers, de 1 à 8 photos ; la première est la photo principale)
-  `photos` JSON NOT NULL COMMENT 'Tableau JSON des noms de fichiers des photos, 1 à 6',
+  `photos` JSON NOT NULL COMMENT 'Tableau JSON des noms de fichiers des photos, 1 à 8',
 
   -- Chats liés (liste d'UUIDs au format JSON, ex: ["uuid-1", "uuid-2"] ; NULL = chat seul)
   `linked_cats` JSON DEFAULT NULL COMMENT 'Liste des UUIDs des chats à adopter ensemble',
@@ -59,6 +59,25 @@ CREATE TABLE `adoption_cats` (
   KEY `idx_adoption_cats_name` (`name`),
   KEY `idx_adoption_cats_created_by` (`created_by`),
   CONSTRAINT `chk_photos_limit` CHECK (JSON_LENGTH(`photos`) BETWEEN 1 AND 8)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Publications des annonces sur les réseaux sociaux (Facebook, plus tard Instagram) : une ligne par chat et par
+-- réseau ; les chats d'une même annonce pointent vers le même post. post_id NULL + last_error : la première
+-- publication a échoué (elle peut être retentée). Supprimer une annonce ne supprime pas le post sur le réseau.
+CREATE TABLE IF NOT EXISTS `adoption_cat_posts` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `cat_uuid` VARCHAR(36) NOT NULL COMMENT 'Chat de l''annonce (adoption_cats.uuid)',
+  `network` ENUM('FACEBOOK', 'INSTAGRAM') NOT NULL COMMENT 'Réseau social',
+  `post_id` VARCHAR(64) DEFAULT NULL COMMENT 'Identifiant du post sur le réseau (NULL si la publication a échoué)',
+  `post_url` VARCHAR(255) DEFAULT NULL COMMENT 'Lien public du post',
+  `last_error` VARCHAR(500) DEFAULT NULL COMMENT 'Dernière erreur du réseau (publication ou mise à jour)',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_adoption_cat_posts_cat_network` (`cat_uuid`, `network`),
+  KEY `idx_adoption_cat_posts_post_id` (`post_id`),
+  CONSTRAINT `fk_adoption_cat_posts_cat` FOREIGN KEY (`cat_uuid`) REFERENCES `adoption_cats` (`uuid`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

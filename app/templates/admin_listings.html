@@ -29,6 +29,22 @@
 {% if deleted_notice %}
 <div class="admin-notice success">✓ Annonce supprimée : <strong>{{ deleted_notice }}</strong>.</div>
 {% endif %}
+{% if fb_error and fb_gone %}
+<div class="admin-notice warning">{{ fb_error }}</div>
+{% elif fb_error %}
+<div class="admin-notice warning">
+  La publication Facebook de l'annonce n'a pas pu être mise à jour : {{ fb_error }}
+  {% if fb_error_uuid %}
+  <form method="POST" action="{{ url_for('admin_sync_facebook', uuid=fb_error_uuid) }}" class="fb-inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn-dialog-secondary">Réessayer la mise à jour Facebook</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% if fb_ok %}
+<div class="admin-notice success">✓ Publication Facebook mise à jour.</div>
+{% endif %}
 
 <div class="listing-toolbar">
   <nav class="listing-tabs" aria-label="Statut des annonces">

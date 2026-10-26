@@ -191,6 +191,26 @@ class AdoptionCat(db.Model):
         return f"<AdoptionCat {self.name} ({self.uuid})>"
 
 
+class AdoptionCatPost(db.Model):
+    """
+    Publication d'une annonce sur un réseau social (Facebook, plus tard Instagram) : une ligne par chat et par
+    réseau. Les chats d'une même annonce pointent vers le même post (post_id identique).
+    post_id NULL avec last_error : la première publication a échoué (elle peut être retentée).
+    """
+    __tablename__ = 'adoption_cat_posts'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    cat_uuid = db.Column(db.String(36), db.ForeignKey('adoption_cats.uuid', ondelete='CASCADE'), nullable=False)
+    network = db.Column(db.Enum('FACEBOOK', 'INSTAGRAM', name='social_network_enum'), nullable=False)
+    post_id = db.Column(db.String(64), nullable=True, index=True)
+    post_url = db.Column(db.String(255), nullable=True)
+    last_error = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (db.UniqueConstraint('cat_uuid', 'network', name='idx_adoption_cat_posts_cat_network'),)
+
+
 class User(UserMixin, db.Model):
     """
     Utilisateur eraFA (table 'users', partagée), en lecture seule.

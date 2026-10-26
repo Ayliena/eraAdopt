@@ -1,14 +1,14 @@
 {% extends 'admin_base.html' %}
 
-{% block title %}Publication Facebook{% endblock %}
+{% block title %}Lien Facebook{% endblock %}
 
 {% block content %}
 <div class="admin-title-row">
-  <h1>Publication Facebook</h1>
+  <h1>Lien Facebook</h1>
 </div>
 <p class="admin-subtitle">
-  Page de test de la publication sur Facebook : le texte saisi est publié tel quel sur la page configurée
-  pour ce site{% if config.DEVEL_SITE %} (site de développement : page Facebook de test){% endif %}.
+  État du lien avec la page Facebook configurée pour ce site{% if config.DEVEL_SITE %} (site de développement :
+  page Facebook de test){% endif %}, et test de publication d'un texte libre.
 </p>
 
 {% if deleted %}
@@ -35,9 +35,24 @@
 
 <!-- État de la configuration et du jeton -->
 <section class="info-card form-card">
-  <h2>Page visée</h2>
+  <h2>État du lien Facebook</h2>
   {% if not configured %}
   <p class="form-hint">Facebook n'est pas configuré : ajoutez <code>FB_PAGE_ID</code> et <code>FB_PAGE_TOKEN</code> dans la config du site.</p>
+  {% elif not checked %}
+  <p class="form-hint">
+    La vérification interroge Facebook (page visée, validité et expiration du jeton, droits accordés).
+    {% if not enabled %}<br>La publication des annonces est coupée (<code>FB_ENABLED = False</code>).{% endif %}
+  </p>
+  <form method="POST" class="form-actions-inline fb-check-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="check">
+    <button type="submit" class="btn-dialog-primary btn-with-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+      </svg>
+      Vérifier l'état du lien Facebook
+    </button>
+  </form>
   {% elif status_error %}
   <div class="admin-notice error">⚠ Impossible de vérifier la page ou le jeton : {{ status_error }}</div>
   {% else %}
@@ -65,10 +80,10 @@
 </section>
 
 <!-- Publication d'un texte libre -->
-{% if configured and not status_error %}
+{% if configured %}
 <form method="POST" class="info-card form-card"
       data-confirm-icon="📣" data-confirm-title="Publier sur Facebook ?" data-confirm-ok="Publier"
-      data-confirm-message="Le texte sera publié publiquement sur la page {{ page.name }}.">
+      data-confirm-message="Le texte sera publié publiquement sur la page Facebook configurée pour ce site.">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="action" value="publish">
   <h2>Publier un texte</h2>
