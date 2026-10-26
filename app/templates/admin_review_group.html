@@ -36,6 +36,12 @@
   {% endif %}
 </p>
 
+{% if fb_gone %}
+<div class="admin-notice warning">La publication Facebook n'existe plus (supprimée sur la page) : l'annonce n'y est plus rattachée.</div>
+{% endif %}
+{% if fb_updated %}
+<div class="admin-notice success">✓ Publication Facebook {{ 'mise à jour' if fb_post_id else 'envoyée' }}.{% if fb_post_url %} <a href="{{ fb_post_url }}" target="_blank" rel="noopener">Voir la publication</a>{% endif %}</div>
+{% endif %}
 {% if saved %}
 <div class="admin-notice success">✓ Modifications enregistrées. {{ "L'annonce est à jour sur le site." if editing else "L'annonce n'est pas encore publiée." }}</div>
 {% endif %}
@@ -163,6 +169,38 @@
   </section>
   {% endfor %}
 
+  <!-- Facebook : publication à la validation, mise à jour du post existant, ou nouvel essai après un échec -->
+  {% if fb_enabled and (not editing or fb_post_id or fb_error) %}
+  <section class="info-card form-card fb-card">
+    <h2>Facebook</h2>
+    {% if fb_post_id %}
+    <p class="form-hint">
+      Cette annonce a une publication sur la page Facebook.
+      {% if fb_post_url %}<a href="{{ fb_post_url }}" target="_blank" rel="noopener">Voir la publication</a>{% endif %}
+    </p>
+    {% if fb_error %}
+    <div class="admin-notice warning">La dernière mise à jour de la publication a échoué : {{ fb_error }}
+      <a href="{{ url_for('admin_edit_facebook', uuid=group.main_cat.uuid) }}">Réessayer</a></div>
+    {% endif %}
+    <label class="fb-check">
+      <input type="checkbox" name="facebook" value="1" checked>
+      <span>Mettre à jour la publication Facebook <span class="form-label-hint">(aperçu du nouveau texte avant l'envoi ; les photos ne changent pas)</span></span>
+    </label>
+    {% elif fb_error and editing %}
+    <div class="admin-notice warning">La publication sur Facebook a échoué : {{ fb_error }}</div>
+    <a href="{{ url_for('admin_edit_facebook', uuid=group.main_cat.uuid) }}" class="btn-dialog-secondary btn-link">Réessayer de publier sur Facebook</a>
+    {% else %}
+    {% if fb_error %}
+    <div class="admin-notice warning">Une première tentative de publication sur Facebook a échoué : {{ fb_error }}</div>
+    {% endif %}
+    <label class="fb-check">
+      <input type="checkbox" name="facebook" value="1" id="facebookPublish">
+      <span>Publier aussi sur Facebook <span class="form-label-hint">(texte et photos de l'annonce ; aperçu avant l'envoi)</span></span>
+    </label>
+    {% endif %}
+  </section>
+  {% endif %}
+
   <!-- Actions -->
   <div class="form-actions">
     {% if editing %}
@@ -170,7 +208,7 @@
     <button type="submit" name="action" value="save" class="btn-dialog-primary">Enregistrer</button>
     {% else %}
     <button type="submit" name="action" value="save" class="btn-dialog-secondary">Enregistrer</button>
-    <button type="submit" name="action" value="publish" class="btn-dialog-primary"
+    <button type="submit" name="action" value="publish" class="btn-dialog-primary" id="publishButton"
       data-confirm-icon="🐾" data-confirm-title="Publier l'annonce ?" data-confirm-ok="Publier"
       data-confirm-message="{{ ('Les ' ~ cats|length ~ ' chats (' ~ group.names_display ~ ') seront visibles') if cats|length > 1 else (group.names_display ~ ' sera visible') }} sur le site des adoptions.">
       Valider et publier
@@ -180,6 +218,22 @@
 </form>
 
 <script>
+  // « Publier aussi sur Facebook » coché : l'aperçu du post remplace la confirmation de publication
+  (() => {
+    const checkbox = document.getElementById('facebookPublish');
+    const button = document.getElementById('publishButton');
+    if (!checkbox || !button) return;
+    const label = button.textContent.trim();
+    const message = button.dataset.confirmMessage;
+    function refresh() {
+      button.textContent = checkbox.checked ? "Valider et voir l'aperçu Facebook" : label;
+      if (checkbox.checked) delete button.dataset.confirmMessage;
+      else button.dataset.confirmMessage = message;
+    }
+    checkbox.addEventListener('change', refresh);
+    refresh();
+  })();
+
   (() => {
     const MAX_PHOTOS = {{ max_photos }};
     const MAX_SIDE = 1600;

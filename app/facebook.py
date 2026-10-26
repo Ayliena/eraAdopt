@@ -13,10 +13,21 @@ from flask import current_app
 
 DEFAULT_GRAPH_VERSION = 'v26.0'
 TIMEOUT = 15  # secondes : une panne de Facebook ne doit pas bloquer le site
+REQUIRED_SCOPES = {'pages_manage_posts', 'pages_read_engagement'}
 
 
 class FacebookError(Exception):
-    pass
+    """Erreur de l'API Graph ; code et subcode : codes d'erreur de Meta (None si Facebook n'a pas répondu)."""
+
+    def __init__(self, message, code=None, subcode=None):
+        super().__init__(message)
+        self.code = code
+        self.subcode = subcode
+
+
+def is_enabled():
+    """Publication des annonces active : configurée, et non coupée par FB_ENABLED = False."""
+    return is_configured() and current_app.config.get('FB_ENABLED', True)
 
 
 def is_configured():
@@ -41,12 +52,14 @@ def _call(method, path, params=None):
     except HTTPError as e:
         try:
             error = json.loads(e.read().decode()).get('error', {})
-            message = error.get('message') or str(e)
         except ValueError:
-            message = str(e)
+            error = {}
+        message = error.get('message') or str(e)
+        code, subcode = error.get('code'), error.get('error_subcode')
         # le message de Meta ne contient pas le jeton : il peut être affiché et journalisé
-        current_app.logger.warning("Erreur de l'API Facebook (%s %s) : %s", method, path, message)
-        raise FacebookError(message) from e
+        current_app.logger.warning("Erreur de l'API Facebook (%s %s) : %s [code %s, sous-code %s]",
+                                   method, path, message, code, subcode)
+        raise FacebookError(message, code, subcode) from e
     except (URLError, TimeoutError, ValueError) as e:
         current_app.logger.warning("Facebook injoignable (%s %s) : %s", method, path, e)
         raise FacebookError(f"Facebook injoignable : {e}") from e
@@ -72,9 +85,64 @@ def publish_text(message):
     return _call('POST', f"{current_app.config['FB_PAGE_ID']}/feed", {'message': message})['id']
 
 
+def publish_photos_post(message, photo_urls):
+    """
+    Publie un post avec plusieurs photos (dans l'ordre donné) ; retourne l'identifiant du post.
+    Les photos sont d'abord envoyées sans être publiées (Facebook les récupère à leur adresse publique),
+    puis rattachées au post. En cas d'échec, les photos déjà envoyées sont supprimées (au mieux).
+    """
+    page_id = current_app.config['FB_PAGE_ID']
+    media_ids = []
+    try:
+        for url in photo_urls:
+            media_ids.append(_call('POST', f"{page_id}/photos", {'url': url, 'published': 'false'})['id'])
+        params = {'message': message}
+        for i, media_id in enumerate(media_ids):
+            params[f'attached_media[{i}]'] = json.dumps({'media_fbid': media_id})
+        return _call('POST', f"{page_id}/feed", params)['id']
+    except FacebookError:
+        for media_id in media_ids:
+            try:
+                _call('DELETE', media_id)
+            except FacebookError:
+                pass
+        raise
+
+
+def update_post_text(post_id, message):
+    """Remplace le texte d'un post existant (les photos ne changent pas)."""
+    _call('POST', post_id, {'message': message})
+
+
 def post_link(post_id):
     """Lien public du post."""
     return _call('GET', post_id, {'fields': 'permalink_url'}).get('permalink_url')
+
+
+def post_exists(post_id):
+    """
+    True si le post existe, False s'il n'existe plus (supprimé à la main sur la page), None si on ne peut pas
+    savoir (Facebook injoignable, jeton en cause...).
+    Facebook ne distingue pas « post supprimé » d'un manque de droits : lire un post supprimé renvoie
+    « (#10) Object does not exist, cannot be loaded due to missing permission... » (ou #100 / 33). On vérifie
+    donc aussi que la page elle-même reste lisible et que le jeton est valide avec ses droits : si oui, c'est
+    bien le post qui a disparu. Au moindre doute (Facebook injoignable, autre erreur), on ne conclut pas.
+    """
+    try:
+        _call('GET', post_id, {'fields': 'id'})
+        return True
+    except FacebookError as e:
+        if e.code not in (10, 100):
+            return None
+    try:
+        page_info()
+        token = token_info()
+    except FacebookError:
+        return None  # le jeton ou la page posent problème : on ne conclut pas
+    # jeton valide et toujours muni des droits de lecture et de publication : c'est bien le post qui a disparu
+    if not token.get('is_valid') or not REQUIRED_SCOPES <= set(token.get('scopes') or []):
+        return None
+    return False
 
 
 def delete_post(post_id):

@@ -1,0 +1,69 @@
+{% extends 'admin_base.html' %}
+
+{% block title %}Facebook : {{ group.names_display }}{% endblock %}
+
+{% block content %}
+<a href="{{ form_url }}" class="admin-back">← Retour au formulaire</a>
+<div class="admin-title-row">
+  <h1>{{ 'Mettre à jour la publication Facebook' if update else 'Publier sur Facebook' }}</h1>
+</div>
+<p class="admin-subtitle">
+  {% if update %}
+  Le texte de la publication sera remplacé par celui-ci. Les photos de la publication ne changent pas.
+  {% if post_url %}<a href="{{ post_url }}" target="_blank" rel="noopener">Voir la publication actuelle</a>{% endif %}
+  {% elif mode == 'review' %}
+  Aperçu de la publication de <strong>{{ group.names_display }}</strong>. Après l'envoi sur Facebook, l'annonce sera aussi mise en ligne sur le site.
+  {% else %}
+  Nouvel essai de publication de <strong>{{ group.names_display }}</strong> sur Facebook.
+  {% endif %}
+</p>
+
+{% if error %}
+<div class="admin-notice error">⚠ Facebook a refusé ou n'a pas répondu : {{ error }}</div>
+{% elif last_error %}
+<div class="admin-notice warning">Le dernier envoi a échoué : {{ last_error }}</div>
+{% endif %}
+
+<section class="info-card form-card">
+  <h2>Aperçu</h2>
+  <div class="fb-preview">
+    <div class="fb-preview-text">{{ text }}</div>
+    {% if photos %}
+    <div class="fb-preview-photos">
+      {% for url in photos %}<img src="{{ url }}" alt="Photo {{ loop.index }}" loading="lazy">{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<div class="form-actions">
+  <a href="{{ form_url }}" class="btn-dialog-secondary btn-link">Retour au formulaire</a>
+  {% if mode == 'review' and error %}
+  <form method="POST"
+        data-confirm-icon="🐾" data-confirm-title="Mettre en ligne sans Facebook ?" data-confirm-ok="Mettre en ligne"
+        data-confirm-message="L'annonce sera publiée sur le site seulement. Vous pourrez réessayer la publication Facebook depuis sa page de modification.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="without">
+    <button type="submit" class="btn-dialog-secondary">Mettre en ligne sans Facebook</button>
+  </form>
+  {% endif %}
+  <form method="POST" class="fb-send-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="send">
+    <button type="submit" class="btn-dialog-primary">
+      {% if error %}Réessayer{% elif update %}Mettre à jour sur Facebook{% elif mode == 'review' %}Publier sur Facebook et mettre en ligne{% else %}Publier sur Facebook{% endif %}
+    </button>
+  </form>
+</div>
+
+<script>
+  // Un seul envoi : Facebook peut mettre quelques secondes à répondre (photos)
+  document.querySelectorAll('.fb-send-form').forEach((form) => {
+    form.addEventListener('submit', () => {
+      const button = form.querySelector('button');
+      button.disabled = true;
+      button.textContent = 'Envoi en cours…';
+    });
+  });
+</script>
+{% endblock %}

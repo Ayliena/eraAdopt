@@ -52,3 +52,7 @@ ERAFA_URL = "https://fa.association-era.org"
 FB_PAGE_ID = ""
 FB_PAGE_TOKEN = ""
 FB_GRAPH_VERSION = "v26.0"
+# Publication des annonces sur Facebook à la validation (False : coupée, même si la page est configurée)
+FB_ENABLED = True
+# Adresse publique du site : liens et photos envoyés à Facebook (qui récupère les photos à cette adresse)
+SITE_URL = "https://adoptions.association-era.org"

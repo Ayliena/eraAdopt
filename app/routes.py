@@ -10,8 +10,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from app import app, db, login_manager
 from app.photos import PhotoError, remove_files
-from app.models import AdoptionCat, User, build_groups, build_review_groups, photo_public_url, join_names_fr
-from app import review_form, facebook
+from app.models import AdoptionCat, AdoptionCatPost, User, build_groups, build_review_groups, photo_public_url, join_names_fr
+from app import review_form, facebook, facebook_post
 from app.seed_data import SEED_CATS, COLOR_PHOTOS
 from app.helpers import slugify_name, build_contact_mailto, fold_text, MAIL_BODY_LINES
 
@@ -237,6 +237,7 @@ def admin_review_list():
     if request.args.get('publie'):
         published = AdoptionCat.query.filter_by(uuid=request.args['publie'], status='ACCEPTED').first()
     return render_template('admin_review_list.html', groups=build_review_groups(), published=published,
+                           published_on_facebook=request.args.get('facebook') == '1',
                            photo_errors=request.args.get('photos_erreur', 0, type=int))
 
 @app.route('/admin/annonces')
@@ -271,6 +272,10 @@ def admin_listings():
         still_archived_notice=request.args.get('encore_archive'),
         deleted_notice=request.args.get('supprimee'),
         photo_errors=request.args.get('photos_erreur', 0, type=int),
+        fb_error=request.args.get('fb_erreur'),
+        fb_error_uuid=request.args.get('fb_annonce'),
+        fb_gone=request.args.get('fb_supprime') == '1',
+        fb_ok=request.args.get('fb_ok') == '1',
         published_count=len(published_groups),
         archived_count=len(archived_groups),
     )
@@ -300,7 +305,11 @@ def group_form_page(group, mode):
         if not errors:
             review_form.apply_values(group, common, own)
             publish = mode == 'review' and request.form.get('action') == 'publish'
-            if publish:
+            # Publication / mise à jour Facebook demandée : enregistrement, puis aperçu du post avant envoi
+            # (l'annonce n'est mise en ligne qu'après l'envoi, ou sans Facebook depuis l'aperçu)
+            to_facebook = request.form.get('facebook') == '1' and facebook.is_enabled() and (
+                publish or (mode == 'edit' and facebook_post.listing_post(group.cats)[0]))
+            if publish and not to_facebook:
                 for cat in review_form.editable_cats(group):
                     cat.status = 'ACCEPTED'
             try:
@@ -314,6 +323,9 @@ def group_form_page(group, mode):
             # Fichiers des photos retirées : supprimés du disque une fois la base à jour
             failed = review_form.delete_photo_files(common['photos_delete'], app.config['UPLOAD_FOLDER'], app.logger)
             extra = {'photos_erreur': len(failed)} if failed else {}
+            if to_facebook:
+                endpoint = 'admin_review_facebook' if mode == 'review' else 'admin_edit_facebook'
+                return redirect(url_for(endpoint, uuid=group.main_cat.uuid, **extra))
             if publish:
                 return redirect(url_for('admin_review_list', publie=group.main_cat.uuid, **extra))
             endpoint = 'admin_review_group' if mode == 'review' else 'admin_edit_listing'
@@ -322,6 +334,7 @@ def group_form_page(group, mode):
         common, own, _ = review_form.initial_values(group)
 
     _, _, differences = review_form.initial_values(group)
+    fb_post_id, fb_post_url, fb_error = facebook_post.listing_post(group.cats)
     return render_template(
         'admin_review_group.html',
         mode=mode,
@@ -338,6 +351,12 @@ def group_form_page(group, mode):
         new_photos_lost=bool(errors and common.get('photos_new')),
         max_photos=app.config.get('MAX_PHOTOS', 8),
         form=review_form,
+        fb_enabled=facebook.is_enabled(),
+        fb_post_id=fb_post_id,
+        fb_post_url=fb_post_url,
+        fb_error=fb_error,
+        fb_updated=request.args.get('facebook') == '1',
+        fb_gone=request.args.get('fb_supprime') == '1',
     )
 
 @app.route('/admin/validation/<uuid>', methods=['GET', 'POST'])
@@ -351,6 +370,94 @@ def admin_review_group(uuid):
 def admin_edit_listing(uuid):
     """Modification d'une annonce publiée."""
     return group_form_page(find_group('ACCEPTED', uuid), 'edit')
+
+def facebook_preview_page(group, mode):
+    """
+    Aperçu du post Facebook d'une annonce, puis envoi :
+    - mode 'review' : publication du post, puis mise en ligne de l'annonce (ou mise en ligne sans Facebook) ;
+    - mode 'edit' : mise à jour du texte du post existant, ou nouvel essai si la publication avait échoué.
+    """
+    if not facebook.is_enabled():
+        abort(404)
+    post_id, post_url, last_error = facebook_post.listing_post(group.cats)
+    if mode == 'edit' and not post_id and not last_error:
+        abort(404)  # annonce publiée sans Facebook : pas de post à créer après coup
+    cats = facebook_post.post_cats(post_id) if post_id else list(group.cats)
+    form_endpoint = 'admin_review_group' if mode == 'review' else 'admin_edit_listing'
+    error = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if mode == 'review' and action == 'without':
+            for cat in review_form.editable_cats(group):
+                cat.status = 'ACCEPTED'
+            db.session.commit()
+            return redirect(url_for('admin_review_list', publie=group.main_cat.uuid))
+        if action != 'send':
+            abort(400)
+        try:
+            if post_id:
+                facebook_post.update(post_id)
+            else:
+                facebook_post.publish(cats)
+                if mode == 'review':
+                    for cat in review_form.editable_cats(group):
+                        cat.status = 'ACCEPTED'
+            db.session.commit()
+            if mode == 'review':
+                return redirect(url_for('admin_review_list', publie=group.main_cat.uuid, facebook=1))
+            return redirect(url_for('admin_edit_listing', uuid=group.main_cat.uuid, facebook=1))
+        except facebook_post.PostGone:
+            db.session.commit()  # suivi retiré : l'annonce est désormais sans Facebook
+            return redirect(url_for(form_endpoint, uuid=group.main_cat.uuid, fb_supprime=1))
+        except facebook.FacebookError as e:
+            db.session.commit()  # l'erreur est gardée avec l'annonce, pour pouvoir réessayer plus tard
+            error = str(e)
+
+    return render_template(
+        'admin_facebook_preview.html',
+        mode=mode,
+        group=group,
+        update=bool(post_id),
+        post_url=post_url,
+        text=facebook_post.build_text(cats),
+        photos=[] if post_id else facebook_post.photo_urls(cats),
+        error=error,
+        last_error=None if error else last_error,
+        form_url=url_for(form_endpoint, uuid=group.main_cat.uuid),
+    )
+
+@app.route('/admin/validation/<uuid>/facebook', methods=['GET', 'POST'])
+@admin_required
+def admin_review_facebook(uuid):
+    """Aperçu et publication sur Facebook d'une annonce en attente, puis mise en ligne."""
+    return facebook_preview_page(find_group('UNDER_REVIEW', uuid, ('ACCEPTED',)), 'review')
+
+@app.route('/admin/annonces/<uuid>/facebook', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_facebook(uuid):
+    """Aperçu et mise à jour (ou nouvel essai de publication) du post Facebook d'une annonce publiée."""
+    return facebook_preview_page(find_group('ACCEPTED', uuid), 'edit')
+
+def facebook_notice(result, uuid):
+    """Paramètres d'URL de l'avertissement Facebook après un archivage ou une remise en ligne (vide si tout va bien)."""
+    if not result:
+        return {}
+    error, gone = result
+    # post supprimé sur Facebook : rien à réessayer, l'annonce n'y est plus rattachée
+    return {'fb_erreur': error, 'fb_supprime': 1} if gone else {'fb_erreur': error, 'fb_annonce': uuid}
+
+@app.route('/admin/annonces/<uuid>/facebook/synchroniser', methods=['POST'])
+@admin_required
+def admin_sync_facebook(uuid):
+    """Nouvel essai de mise à jour du post Facebook après un archivage ou une remise en ligne (sans aperçu)."""
+    cat = AdoptionCat.query.filter(AdoptionCat.uuid == uuid,
+                                   AdoptionCat.status.in_(['ACCEPTED', 'ARCHIVED'])).first_or_404()
+    group = find_group(cat.status, uuid)
+    result = facebook_post.sync_after_status_change(group.cats)
+    extra = {'statut': 'archivees'} if cat.status == 'ARCHIVED' else {}
+    extra.update(facebook_notice(result, uuid) or {'fb_ok': 1})
+    return redirect(url_for('admin_listings', **extra))
 
 def selected_cats(group):
     """Chats d'une annonce visés par une action : ceux cochés dans la popup (choix=1), sinon tous."""
@@ -377,11 +484,14 @@ def admin_archive_listing(uuid):
         cat.status = 'ARCHIVED'
     db.session.commit()
 
+    # Post Facebook de l'annonce : « adopté » pour les chats archivés (mis à jour sans aperçu)
+    extra = facebook_notice(facebook_post.sync_after_status_change(group.cats), to_archive[0].uuid)
+
     archived_names = join_names_fr(c.name for c in to_archive)
     if remaining:
         # rappel : la description et les photos communes parlent peut-être encore des chats archivés
-        return redirect(url_for('admin_listings', archivee=archived_names, reste=remaining[0].uuid))
-    return redirect(url_for('admin_listings', archivee=archived_names))
+        return redirect(url_for('admin_listings', archivee=archived_names, reste=remaining[0].uuid, **extra))
+    return redirect(url_for('admin_listings', archivee=archived_names, **extra))
 
 @app.route('/admin/annonces/<uuid>/remettre-en-ligne', methods=['POST'])
 @admin_required
@@ -407,8 +517,11 @@ def admin_restore_listing(uuid):
     for cat in to_restore:
         cat.status = 'ACCEPTED'
     db.session.commit()
+
+    # Post Facebook de l'annonce : de nouveau « à l'adoption » pour les chats remis en ligne
+    extra = facebook_notice(facebook_post.sync_after_status_change(group.cats), to_restore[0].uuid)
     return redirect(url_for('admin_listings', statut='archivees', remise=join_names_fr(c.name for c in to_restore),
-                            encore_archive=join_names_fr(c.name for c in still_archived) or None))
+                            encore_archive=join_names_fr(c.name for c in still_archived) or None, **extra))
 
 @app.route('/admin/annonces/<uuid>/supprimer', methods=['POST'])
 @admin_required
@@ -451,25 +564,28 @@ def admin_facebook():
     La page visée dépend de la configuration (page de test en développement).
     """
     error, message = None, ''
-    if request.method == 'POST':
-        try:
-            if request.form.get('action') == 'delete':
-                post_id = request.form.get('post_id', '')
-                if not valid_post_id(post_id):
-                    abort(400)
-                facebook.delete_post(post_id)
-                return redirect(url_for('admin_facebook', supprime=1))
+    action = request.form.get('action') if request.method == 'POST' else None
+    try:
+        if action == 'delete':
+            post_id = request.form.get('post_id', '')
+            if not valid_post_id(post_id):
+                abort(400)
+            facebook.delete_post(post_id)
+            return redirect(url_for('admin_facebook', supprime=1))
+        if action == 'publish':
             message = request.form.get('message', '').strip()
             if not message:
                 error = "Le texte est vide."
             else:
                 post_id = facebook.publish_text(message)
                 return redirect(url_for('admin_facebook', post=post_id))
-        except facebook.FacebookError as e:
-            error = str(e)
+    except facebook.FacebookError as e:
+        error = str(e)
 
+    # État du lien (page et jeton) : vérifié seulement à la demande, pour ne pas consommer d'appels à l'affichage
+    checked = action == 'check'
     page, token, status_error = None, None, None
-    if facebook.is_configured():
+    if checked and facebook.is_configured():
         try:
             page = facebook.page_info()
             token = facebook.token_info()
@@ -488,6 +604,8 @@ def admin_facebook():
     return render_template(
         'admin_facebook.html',
         configured=facebook.is_configured(),
+        enabled=facebook.is_enabled(),
+        checked=checked,
         page=page,
         token=token,
         token_expires=(datetime.fromtimestamp(token['expires_at']).strftime('%d/%m/%Y')
@@ -563,6 +681,10 @@ def seed_test():
             for field, value in data.items():
                 setattr(cat, field, list(value) if isinstance(value, list) else value)
             cat.adoption_mode = data.get('adoption_mode', 'TOGETHER')
+
+        # Suivi Facebook des fiches de test remis à zéro : le seed ne publie jamais rien (les posts restent sur la page)
+        AdoptionCatPost.query.filter(AdoptionCatPost.cat_uuid.in_([d['uuid'] for d in SEED_CATS])).delete(
+            synchronize_session=False)
 
         # Les annonces créées en dehors du jeu de test (ex. par les testeurs) sont publiées
         seed_uuids = [d['uuid'] for d in SEED_CATS]

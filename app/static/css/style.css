@@ -2003,3 +2003,70 @@ footer {
   justify-content: flex-end;
   margin-top: 12px;
 }
+
+.fb-check-form {
+  justify-content: flex-start;
+}
+
+/* Aperçu du post Facebook d'une annonce */
+.fb-preview {
+  max-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.fb-preview-text {
+  padding: 14px 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.fb-preview-photos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.fb-preview-photos img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+
+/* Bloc Facebook du formulaire d'une annonce */
+.fb-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.fb-check input {
+  margin-top: 4px;
+}
+
+.fb-card .admin-notice {
+  margin-bottom: 12px;
+}
+
+.form-actions form {
+  display: inline;
+}
+
+.user-bar-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  text-decoration: none;
+}
+
+.btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
