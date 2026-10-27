@@ -16,7 +16,7 @@
 {% endif %}
 {% if published %}
 <div class="admin-notice success">
-  ✓ Annonce publiée{{ ' sur le site et sur Facebook' if published_on_facebook }} : <strong>{{ published.adoption_names_display }}</strong>.
+  ✓ Annonce publiée{% if facebook_scheduled %} sur le site (publication Facebook programmée le {{ facebook_scheduled }}){% elif published_on_facebook %} sur le site et sur Facebook{% endif %} : <strong>{{ published.adoption_names_display }}</strong>.
   <a href="{{ url_for('cat_detail', uuid=published.uuid) }}">Voir sur le site</a>
 </div>
 {% endif %}
