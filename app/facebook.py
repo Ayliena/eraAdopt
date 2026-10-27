@@ -85,11 +85,13 @@ def publish_text(message):
     return _call('POST', f"{current_app.config['FB_PAGE_ID']}/feed", {'message': message})['id']
 
 
-def publish_photos_post(message, photo_urls):
+def publish_photos_post(message, photo_urls, scheduled_at=None):
     """
     Publie un post avec plusieurs photos (dans l'ordre donné) ; retourne l'identifiant du post.
     Les photos sont d'abord envoyées sans être publiées (Facebook les récupère à leur adresse publique),
     puis rattachées au post. En cas d'échec, les photos déjà envoyées sont supprimées (au mieux).
+    scheduled_at (datetime avec fuseau) : post programmé, mis en ligne par Facebook à cette date
+    (entre 10 minutes et 30 jours après l'envoi, sinon Facebook refuse).
     """
     page_id = current_app.config['FB_PAGE_ID']
     media_ids = []
@@ -97,6 +99,8 @@ def publish_photos_post(message, photo_urls):
         for url in photo_urls:
             media_ids.append(_call('POST', f"{page_id}/photos", {'url': url, 'published': 'false'})['id'])
         params = {'message': message}
+        if scheduled_at:
+            params.update(published='false', scheduled_publish_time=str(int(scheduled_at.timestamp())))
         for i, media_id in enumerate(media_ids):
             params[f'attached_media[{i}]'] = json.dumps({'media_fbid': media_id})
         return _call('POST', f"{page_id}/feed", params)['id']

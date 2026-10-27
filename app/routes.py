@@ -238,6 +238,7 @@ def admin_review_list():
         published = AdoptionCat.query.filter_by(uuid=request.args['publie'], status='ACCEPTED').first()
     return render_template('admin_review_list.html', groups=build_review_groups(), published=published,
                            published_on_facebook=request.args.get('facebook') == '1',
+                           facebook_scheduled=request.args.get('programme'),
                            photo_errors=request.args.get('photos_erreur', 0, type=int))
 
 @app.route('/admin/annonces')
@@ -335,6 +336,7 @@ def group_form_page(group, mode):
 
     _, _, differences = review_form.initial_values(group)
     fb_post_id, fb_post_url, fb_error = facebook_post.listing_post(group.cats)
+    fb_scheduled = facebook_post.scheduled_at(group.cats) if fb_post_id else None
     return render_template(
         'admin_review_group.html',
         mode=mode,
@@ -355,6 +357,7 @@ def group_form_page(group, mode):
         fb_post_id=fb_post_id,
         fb_post_url=fb_post_url,
         fb_error=fb_error,
+        fb_scheduled=fb_scheduled,
         fb_updated=request.args.get('facebook') == '1',
         fb_gone=request.args.get('fb_supprime') == '1',
     )
@@ -385,6 +388,10 @@ def facebook_preview_page(group, mode):
     cats = facebook_post.post_cats(post_id) if post_id else list(group.cats)
     form_endpoint = 'admin_review_group' if mode == 'review' else 'admin_edit_listing'
     error = None
+    # Programmation de la publication : seulement à la validation (les autres envois mettent à jour un post)
+    can_schedule = mode == 'review' and not post_id
+    default_day, default_time = facebook_post.default_schedule()
+    schedule = {'on': False, 'day': default_day, 'time': default_time, 'error': None}
 
     if request.method == 'POST':
         action = request.form.get('action')
@@ -395,24 +402,31 @@ def facebook_preview_page(group, mode):
             return redirect(url_for('admin_review_list', publie=group.main_cat.uuid))
         if action != 'send':
             abort(400)
-        try:
-            if post_id:
-                facebook_post.update(post_id)
-            else:
-                facebook_post.publish(cats)
+        scheduled = None
+        if can_schedule and request.form.get('schedule') == '1':
+            schedule.update(on=True, day=request.form.get('schedule_day', ''), time=request.form.get('schedule_time', ''))
+            scheduled, schedule['error'] = facebook_post.parse_schedule(schedule['day'], schedule['time'])
+        # date de programmation invalide : rien n'est envoyé, la page se réaffiche avec l'erreur
+        if not schedule['error']:
+            try:
+                if post_id:
+                    facebook_post.update(post_id)
+                else:
+                    facebook_post.publish(cats, scheduled)
+                    if mode == 'review':
+                        for cat in review_form.editable_cats(group):
+                            cat.status = 'ACCEPTED'
+                db.session.commit()
                 if mode == 'review':
-                    for cat in review_form.editable_cats(group):
-                        cat.status = 'ACCEPTED'
-            db.session.commit()
-            if mode == 'review':
-                return redirect(url_for('admin_review_list', publie=group.main_cat.uuid, facebook=1))
-            return redirect(url_for('admin_edit_listing', uuid=group.main_cat.uuid, facebook=1))
-        except facebook_post.PostGone:
-            db.session.commit()  # suivi retiré : l'annonce est désormais sans Facebook
-            return redirect(url_for(form_endpoint, uuid=group.main_cat.uuid, fb_supprime=1))
-        except facebook.FacebookError as e:
-            db.session.commit()  # l'erreur est gardée avec l'annonce, pour pouvoir réessayer plus tard
-            error = str(e)
+                    return redirect(url_for('admin_review_list', publie=group.main_cat.uuid, facebook=1,
+                                            programme=scheduled.strftime('%d/%m/%Y à %H:%M') if scheduled else None))
+                return redirect(url_for('admin_edit_listing', uuid=group.main_cat.uuid, facebook=1))
+            except facebook_post.PostGone:
+                db.session.commit()  # suivi retiré : l'annonce est désormais sans Facebook
+                return redirect(url_for(form_endpoint, uuid=group.main_cat.uuid, fb_supprime=1))
+            except facebook.FacebookError as e:
+                db.session.commit()  # l'erreur est gardée avec l'annonce, pour pouvoir réessayer plus tard
+                error = str(e)
 
     return render_template(
         'admin_facebook_preview.html',
@@ -425,6 +439,11 @@ def facebook_preview_page(group, mode):
         error=error,
         last_error=None if error else last_error,
         form_url=url_for(form_endpoint, uuid=group.main_cat.uuid),
+        can_schedule=can_schedule,
+        schedule=schedule,
+        schedule_min_day=facebook_post.schedule_bounds()[0],
+        schedule_max_day=facebook_post.schedule_bounds()[1],
+        time_slots=facebook_post.time_slots(),
     )
 
 @app.route('/admin/validation/<uuid>/facebook', methods=['GET', 'POST'])

@@ -36,6 +36,37 @@
   </div>
 </section>
 
+{% if can_schedule %}
+<!-- Programmation (facultative) : sans elle, le post est publié tout de suite -->
+<section class="info-card form-card fb-schedule">
+  <h2>Programmation</h2>
+  <label class="fb-check">
+    <input type="checkbox" name="schedule" value="1" id="scheduleToggle" form="fbSendForm" {{ 'checked' if schedule.on }}>
+    <span>Programmer la publication <span class="form-label-hint">(sinon, elle est publiée tout de suite)</span></span>
+  </label>
+  <div class="fb-schedule-fields" id="scheduleFields" {{ 'hidden' if not schedule.on }}>
+    <p class="form-hint">
+      Sélectionnez une date et une heure futures pour la mise en ligne de la publication sur Facebook
+      (entre 10 minutes et 30 jours). L'annonce est mise en ligne sur le site dès maintenant.
+    </p>
+    <div class="fb-schedule-row">
+      <label class="fb-schedule-field">
+        <span class="fb-schedule-label">📅 Date</span>
+        <input type="date" name="schedule_day" class="form-input" form="fbSendForm"
+               value="{{ schedule.day }}" min="{{ schedule_min_day }}" max="{{ schedule_max_day }}">
+      </label>
+      <label class="fb-schedule-field">
+        <span class="fb-schedule-label">🕒 Heure</span>
+        <select name="schedule_time" class="form-input" form="fbSendForm">
+          {% for slot in time_slots %}<option value="{{ slot }}" {{ 'selected' if slot == schedule.time }}>{{ slot }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    {% if schedule.error %}<p class="field-error">{{ schedule.error }}</p>{% endif %}
+  </div>
+</section>
+{% endif %}
+
 <div class="form-actions">
   <a href="{{ form_url }}" class="btn-dialog-secondary btn-link">Retour au formulaire</a>
   {% if mode == 'review' and error %}
@@ -47,16 +78,34 @@
     <button type="submit" class="btn-dialog-secondary">Mettre en ligne sans Facebook</button>
   </form>
   {% endif %}
-  <form method="POST" class="fb-send-form">
+  <form method="POST" class="fb-send-form" id="fbSendForm">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="action" value="send">
-    <button type="submit" class="btn-dialog-primary">
+    <button type="submit" class="btn-dialog-primary" id="fbSendButton"
+            data-label-schedule="Programmer sur Facebook et mettre en ligne">
       {% if error %}Réessayer{% elif update %}Mettre à jour sur Facebook{% elif mode == 'review' %}Publier sur Facebook et mettre en ligne{% else %}Publier sur Facebook{% endif %}
     </button>
   </form>
 </div>
 
 <script>
+  // Programmation : champs date / heure affichés seulement si la case est cochée
+  (() => {
+    const toggle = document.getElementById('scheduleToggle');
+    const fields = document.getElementById('scheduleFields');
+    const button = document.getElementById('fbSendButton');
+    if (!toggle) return;
+    const label = button.textContent.trim();
+    function refresh() {
+      fields.hidden = !toggle.checked;
+      if (!label.startsWith('Réessayer')) {
+        button.textContent = toggle.checked ? button.dataset.labelSchedule : label;
+      }
+    }
+    toggle.addEventListener('change', refresh);
+    refresh();
+  })();
+
   // Un seul envoi : Facebook peut mettre quelques secondes à répondre (photos)
   document.querySelectorAll('.fb-send-form').forEach((form) => {
     form.addEventListener('submit', () => {

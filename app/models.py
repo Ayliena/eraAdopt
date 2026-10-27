@@ -205,6 +205,7 @@ class AdoptionCatPost(db.Model):
     post_id = db.Column(db.String(64), nullable=True, index=True)
     post_url = db.Column(db.String(255), nullable=True)
     last_error = db.Column(db.String(500), nullable=True)
+    scheduled_at = db.Column(db.DateTime, nullable=True)  # mise en ligne programmée (heure locale), sinon NULL
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

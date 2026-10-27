@@ -7,7 +7,8 @@ Le texte est toujours reconstruit entièrement à partir des chats du post (jama
   puis la description, les infos communes et le lien vers l'annonce (ou vers l'accueil une fois adoptés).
 Les chats d'un post sont ceux qui pointent vers son identifiant : un chat archivé reste dans le post (adopté).
 """
-from datetime import date
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from flask import current_app, request, url_for
 from app import db
 from app.models import AdoptionCat, AdoptionCatPost, join_names_fr, photo_public_url
@@ -25,6 +26,14 @@ CHILDREN = {True: "Sociable", False: "Non recommandé"}
 OUTDOOR = {'INDOOR': "Intérieur uniquement", 'OPTIONAL': "Sortie possible", 'REQUIRED': "Sortie nécessaire"}
 # même emoji pour les deux modes, différent du 🐾 de la ligne d'état juste au-dessus
 MODE = {'TOGETHER': "À adopter ensemble 🐱", 'SEPARATE': "Adoptables séparément 🐱"}
+
+
+# Programmation : créneaux de 10 minutes, au plus tôt dans 10 minutes et au plus tard dans 30 jours
+# (limites de Facebook), proposée par défaut 30 minutes plus tard
+SCHEDULE_SLOT = 10
+SCHEDULE_MIN = timedelta(minutes=10)
+SCHEDULE_MAX = timedelta(days=30)
+SCHEDULE_DEFAULT = timedelta(minutes=30)
 
 
 # --- Suivi des posts
@@ -59,15 +68,66 @@ def post_cats(post_id):
     return AdoptionCat.query.filter(AdoptionCat.uuid.in_(uuids)).order_by(AdoptionCat.id).all() if uuids else []
 
 
-def save_rows(cats, post_id=None, post_url=None, error=None):
+def scheduled_at(cats):
+    """Date de mise en ligne programmée du post de l'annonce (heure locale), si elle est encore à venir."""
+    dates = [r.scheduled_at for r in rows_of(cats) if r.post_id and r.scheduled_at]
+    return max(dates) if dates and max(dates) > local_now().replace(tzinfo=None) else None
+
+
+def save_rows(cats, post_id=None, post_url=None, error=None, scheduled=None):
     """Enregistre l'état Facebook des chats (crée ou met à jour leur ligne) ; sans commit."""
     existing = {r.cat_uuid: r for r in rows_of(cats)}
     for c in cats:
         row = existing.get(c.uuid) or AdoptionCatPost(cat_uuid=c.uuid, network=NETWORK)
         if post_id:
             row.post_id, row.post_url = post_id, post_url
+            row.scheduled_at = scheduled.replace(tzinfo=None) if scheduled else None
         row.last_error = error[:500] if error else None
         db.session.add(row)
+
+
+# --- Programmation
+
+def timezone():
+    return ZoneInfo(current_app.config.get('TIMEZONE', 'Europe/Paris'))
+
+
+def local_now():
+    return datetime.now(timezone())
+
+
+def time_slots():
+    """Heures proposées : '00:00', '00:10', ... '23:50'."""
+    return [f"{m // 60:02d}:{m % 60:02d}" for m in range(0, 24 * 60, SCHEDULE_SLOT)]
+
+
+def default_schedule():
+    """Créneau proposé par défaut : dans 30 minutes, arrondi au créneau de 10 minutes suivant -> (date, heure)."""
+    when = local_now() + SCHEDULE_DEFAULT
+    when += timedelta(minutes=-when.minute % SCHEDULE_SLOT, seconds=-when.second, microseconds=-when.microsecond)
+    return when.strftime('%Y-%m-%d'), when.strftime('%H:%M')
+
+
+def schedule_bounds():
+    """Dates permises dans le calendrier (aujourd'hui -> dans 30 jours), au format des champs date."""
+    now = local_now()
+    return now.strftime('%Y-%m-%d'), (now + SCHEDULE_MAX).strftime('%Y-%m-%d')
+
+
+def parse_schedule(day, time):
+    """Date et heure saisies (heure locale) -> (datetime avec fuseau, None) ou (None, message d'erreur)."""
+    if time not in time_slots():
+        return None, "Choisissez une heure dans la liste."
+    try:
+        when = datetime.strptime(f"{day} {time}", '%Y-%m-%d %H:%M').replace(tzinfo=timezone())
+    except ValueError:
+        return None, "Date invalide."
+    now = local_now()
+    if when < now + SCHEDULE_MIN:
+        return None, "La publication doit être programmée au moins 10 minutes à l'avance (limite de Facebook)."
+    if when > now + SCHEDULE_MAX:
+        return None, "La publication ne peut pas être programmée à plus de 30 jours (limite de Facebook)."
+    return when, None
 
 
 # --- Texte du post
@@ -198,13 +258,14 @@ def photo_urls(cats):
 
 # --- Publication et mise à jour
 
-def publish(cats):
+def publish(cats, scheduled=None):
     """
     Publie l'annonce (texte et photos) et enregistre le post pour chacun de ses chats ; sans commit.
+    scheduled : date de mise en ligne programmée (datetime avec fuseau), sinon publication immédiate.
     En cas d'échec, l'erreur est enregistrée pour pouvoir réessayer, puis FacebookError est relevée.
     """
     try:
-        post_id = facebook.publish_photos_post(build_text(cats), photo_urls(cats))
+        post_id = facebook.publish_photos_post(build_text(cats), photo_urls(cats), scheduled)
     except facebook.FacebookError as e:
         save_rows(cats, error=str(e))
         raise
@@ -212,7 +273,7 @@ def publish(cats):
         url = facebook.post_link(post_id)
     except facebook.FacebookError:
         url = None  # le post existe : le lien n'est qu'un plus
-    save_rows(cats, post_id=post_id, post_url=url)
+    save_rows(cats, post_id=post_id, post_url=url, scheduled=scheduled)
     return post_id
 
 

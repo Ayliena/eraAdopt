@@ -175,8 +175,13 @@
     <h2>Facebook</h2>
     {% if fb_post_id %}
     <p class="form-hint">
+      {% if fb_scheduled %}
+      Cette annonce a une publication programmée sur la page Facebook, mise en ligne le {{ fb_scheduled.strftime('%d/%m/%Y à %H:%M') }}
+      (visible dans le Planificateur de la page d'ici là).
+      {% else %}
       Cette annonce a une publication sur la page Facebook.
       {% if fb_post_url %}<a href="{{ fb_post_url }}" target="_blank" rel="noopener">Voir la publication</a>{% endif %}
+      {% endif %}
     </p>
     {% if fb_error %}
     <div class="admin-notice warning">La dernière mise à jour de la publication a échoué : {{ fb_error }}
