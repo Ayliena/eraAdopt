@@ -2100,3 +2100,33 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+/* Suppression d'une annonce en attente (page de validation) */
+.review-delete {
+  margin-top: 18px;
+  text-align: right;
+}
+
+.btn-danger-link {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #c62828;
+  background: none;
+  border: 1.5px solid #f5c2c0;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.btn-danger-link:hover {
+  background: #fdecea;
+}
+
+.user-bar-account {
+  text-decoration: none;
+}
+
+.user-bar-account:hover {
+  text-decoration: underline;
+}

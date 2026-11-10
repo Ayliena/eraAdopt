@@ -14,6 +14,9 @@
 {% if photo_errors %}
 <div class="admin-notice error">⚠ {{ photo_errors }} fichier{{ 's' if photo_errors > 1 }} photo n'{{ 'ont' if photo_errors > 1 else 'a' }} pas pu être supprimé{{ 's' if photo_errors > 1 }} du serveur (voir les logs). Les fiches sont bien à jour.</div>
 {% endif %}
+{% if deleted_notice %}
+<div class="admin-notice success">✓ Annonce supprimée : <strong>{{ deleted_notice }}</strong>.</div>
+{% endif %}
 {% if published %}
 <div class="admin-notice success">
   ✓ Annonce publiée{% if facebook_scheduled %} sur le site (publication Facebook programmée le {{ facebook_scheduled }}){% elif published_on_facebook %} sur le site et sur Facebook{% endif %} : <strong>{{ published.adoption_names_display }}</strong>.
