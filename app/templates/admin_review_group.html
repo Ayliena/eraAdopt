@@ -222,6 +222,16 @@
   </div>
 </form>
 
+{% if not editing %}
+<!-- Suppression de l'annonce en attente (hors du formulaire principal) -->
+<form method="POST" action="{{ url_for('admin_delete_listing', uuid=group.main_cat.uuid) }}" class="review-delete"
+  data-confirm-icon="🗑️" data-confirm-title="Supprimer cette annonce ?" data-confirm-ok="Supprimer" data-confirm-danger
+  data-confirm-message="L'annonce en attente de {{ cats|map(attribute='name')|join(', ') }} sera supprimée, avec ses fiches et ses photos. Cette action est irréversible.">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="btn-danger-link">Supprimer cette annonce en attente</button>
+</form>
+{% endif %}
+
 <script>
   // « Publier aussi sur Facebook » coché : l'aperçu du post remplace la confirmation de publication
   (() => {

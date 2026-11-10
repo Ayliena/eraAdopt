@@ -1,7 +1,7 @@
 {% if current_user.is_authenticated %}
   <div class="user-bar">
     <div class="user-bar-container">
-      <span>👤 Connecté en tant que <strong>{{ current_user.display_name }}</strong>{% if current_user.is_adoption_admin %} <span class="user-bar-role">validation</span>{% endif %}</span>
+      <span>👤 Connecté en tant que <a href="{{ config.ERAFA_URL }}/" class="user-bar-account" title="Aller sur le site des familles d'accueil"><strong>{{ current_user.display_name }}</strong></a>{% if current_user.is_adoption_admin %} <span class="user-bar-role">validation</span>{% endif %}</span>
       <span class="user-bar-links">
         {% if current_user.can_write_listings %}
         <a href="{{ config.ERAFA_URL }}/annonce">Créer une annonce</a>

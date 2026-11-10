@@ -239,6 +239,7 @@ def admin_review_list():
     return render_template('admin_review_list.html', groups=build_review_groups(), published=published,
                            published_on_facebook=request.args.get('facebook') == '1',
                            facebook_scheduled=request.args.get('programme'),
+                           deleted_notice=request.args.get('supprimee'),
                            photo_errors=request.args.get('photos_erreur', 0, type=int))
 
 @app.route('/admin/annonces')
@@ -546,11 +547,12 @@ def admin_restore_listing(uuid):
 @admin_required
 def admin_delete_listing(uuid):
     """
-    Supprime définitivement une annonce (publiée ou archivée) : fiches de tous ses chats et fichiers photo
-    (sauf ceux encore utilisés par une autre fiche). Les liens vers ces chats sont retirés des autres fiches.
+    Supprime définitivement une annonce (en attente, publiée ou archivée) : fiches de ses chats de ce statut et
+    fichiers photo (sauf ceux encore utilisés par une autre fiche). Les liens vers ces chats sont retirés des
+    autres fiches. Une annonce en attente liée à un chat déjà publié ne supprime pas ce dernier.
     """
     cat = AdoptionCat.query.filter(AdoptionCat.uuid == uuid,
-                                   AdoptionCat.status.in_(['ACCEPTED', 'ARCHIVED'])).first_or_404()
+                                   AdoptionCat.status.in_(['UNDER_REVIEW', 'ACCEPTED', 'ARCHIVED'])).first_or_404()
     status = cat.status
     group = find_group(status, uuid)
     names = group.names_display
@@ -566,6 +568,8 @@ def admin_delete_listing(uuid):
 
     failed = review_form.delete_photo_files(photos, app.config['UPLOAD_FOLDER'], app.logger)
     extra = {'photos_erreur': len(failed)} if failed else {}
+    if status == 'UNDER_REVIEW':
+        return redirect(url_for('admin_review_list', supprimee=names, **extra))
     if status == 'ARCHIVED':
         extra['statut'] = 'archivees'
     return redirect(url_for('admin_listings', supprimee=names, **extra))
