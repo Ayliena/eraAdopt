@@ -116,6 +116,20 @@ class AdoptionCat(db.Model):
         return sorted([self] + self.get_linked_cats, key=lambda c: c.id)
 
     @property
+    def adopted_linked_cats(self):
+        """
+        Chats de la même annonce déjà archivés (considérés comme adoptés), du plus ancien au plus récent :
+        affichés en grisé sur la page de l'annonce, comme dans le post Facebook.
+        """
+        group = self.adoption_group
+        known = {c.uuid for c in group}
+        uuids = {u for c in group for u in (c.linked_cats if isinstance(c.linked_cats, list) else [])} - known
+        if not uuids:
+            return []
+        return AdoptionCat.query.filter(AdoptionCat.uuid.in_(uuids), AdoptionCat.status == 'ARCHIVED') \
+            .order_by(AdoptionCat.id).all()
+
+    @property
     def is_separate_adoption(self):
         """Annonce de plusieurs chats adoptables séparément (le mode est porté par le chat de référence)."""
         group = self.adoption_group

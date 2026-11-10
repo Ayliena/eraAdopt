@@ -193,6 +193,30 @@
         </div>
         {% endif %}
 
+        {% set adopted = cat.adopted_linked_cats %}
+        {% if adopted %}
+        <!-- Chats de l'annonce déjà adoptés (archivés) : grisés, comme dans le post Facebook ; ils ne sont proposés
+             nulle part au contact -->
+        {% set female = adopted|selectattr('sex', 'equalto', 'MALE')|list|length == 0 %}
+        <div class="info-card">
+          <h2>Déjà adopté{{ 'e' if female }}{{ 's' if adopted|length > 1 }}</h2>
+          <div class="group-cats">
+            {% for c in adopted %}
+            <div class="group-cat adopted">
+              <div class="group-cat-head">
+                <span class="group-cat-name">{{ c.name }}</span>
+                <span class="badge-sex {{ 'male' if c.sex == 'MALE' else 'female' }}">{{ sex_icon(c.sex) }} {{ c.sex_label }}</span>
+              </div>
+              <dl class="group-cat-specs">
+                <div><dt>Âge</dt><dd>{{ c.age_years_months }}</dd></div>
+                {% if c.color %}<div><dt>Couleur</dt><dd>{{ color_text(c.color) }}</dd></div>{% endif %}
+              </dl>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
         <!-- Description (texte collé à la balise : white-space: pre-line conserverait le retour à la ligne) -->
         {% if cat.description %}
         <div class="info-card">

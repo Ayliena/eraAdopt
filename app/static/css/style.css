@@ -2130,3 +2130,9 @@ footer {
 .user-bar-account:hover {
   text-decoration: underline;
 }
+
+/* Chats de l'annonce déjà adoptés (archivés), grisés */
+.group-cat.adopted {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
