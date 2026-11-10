@@ -36,6 +36,13 @@
   {% endif %}
 </p>
 
+{% if restored_notice %}
+<div class="admin-notice success">
+  ✓ Remis en ligne : <strong>{{ restored_notice }}</strong>, de nouveau visible sur le site.
+  {% if still_archived_notice %}Reste dans les archives : <strong>{{ still_archived_notice }}</strong>.{% endif %}<br>
+  Vérifiez l'annonce (âge, description, photos…) et enregistrez si quelque chose a changé.
+</div>
+{% endif %}
 {% if fb_gone %}
 <div class="admin-notice warning">La publication Facebook n'existe plus (supprimée sur la page) : l'annonce n'y est plus rattachée.</div>
 {% endif %}

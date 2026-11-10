@@ -361,6 +361,8 @@ def group_form_page(group, mode):
         fb_scheduled=fb_scheduled,
         fb_updated=request.args.get('facebook') == '1',
         fb_gone=request.args.get('fb_supprime') == '1',
+        restored_notice=request.args.get('remise') if mode == 'edit' and request.method == 'GET' else None,
+        still_archived_notice=request.args.get('encore_archive'),
     )
 
 @app.route('/admin/validation/<uuid>', methods=['GET', 'POST'])
@@ -519,6 +521,7 @@ def admin_restore_listing(uuid):
     """
     Remet en ligne une annonce archivée : tous ses chats, ou seulement ceux cochés (cat_uuids). Photos intactes.
     Un chat remis en ligne rejoint automatiquement les chats de son annonce encore publiés (linked_cats conservés).
+    On arrive ensuite sur la page de modification de l'annonce : après un retour, il y a souvent à corriger.
     """
     group = find_group('ARCHIVED', uuid)
     to_restore = selected_cats(group)
@@ -538,9 +541,12 @@ def admin_restore_listing(uuid):
         cat.status = 'ACCEPTED'
     db.session.commit()
 
-    # Post Facebook de l'annonce : de nouveau « à l'adoption » pour les chats remis en ligne
-    extra = facebook_notice(facebook_post.sync_after_status_change(group.cats), to_restore[0].uuid)
-    return redirect(url_for('admin_listings', statut='archivees', remise=join_names_fr(c.name for c in to_restore),
+    # Post Facebook de l'annonce : de nouveau « à l'adoption » pour les chats remis en ligne. Une erreur reste
+    # enregistrée avec l'annonce et s'affiche sur sa page de modification ; seul un post disparu est signalé ici.
+    result = facebook_post.sync_after_status_change(group.cats)
+    extra = {'fb_supprime': 1} if result and result[1] else {}
+    return redirect(url_for('admin_edit_listing', uuid=to_restore[0].uuid,
+                            remise=join_names_fr(c.name for c in to_restore),
                             encore_archive=join_names_fr(c.name for c in still_archived) or None, **extra))
 
 @app.route('/admin/annonces/<uuid>/supprimer', methods=['POST'])
