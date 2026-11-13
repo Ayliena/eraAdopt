@@ -29,4 +29,4 @@ login_manager.init_app(app)
 app.config.setdefault('WTF_CSRF_TIME_LIMIT', None)
 csrf = CSRFProtect(app)
 
-from app import routes, models
+from app import routes, models, commands

@@ -121,13 +121,7 @@ class AdoptionCat(db.Model):
         Chats de la même annonce déjà archivés (considérés comme adoptés), du plus ancien au plus récent :
         affichés en grisé sur la page de l'annonce, comme dans le post Facebook.
         """
-        group = self.adoption_group
-        known = {c.uuid for c in group}
-        uuids = {u for c in group for u in (c.linked_cats if isinstance(c.linked_cats, list) else [])} - known
-        if not uuids:
-            return []
-        return AdoptionCat.query.filter(AdoptionCat.uuid.in_(uuids), AdoptionCat.status == 'ARCHIVED') \
-            .order_by(AdoptionCat.id).all()
+        return archived_linked_cats(self.adoption_group)
 
     @property
     def is_separate_adoption(self):
@@ -205,6 +199,16 @@ class AdoptionCat(db.Model):
         return f"<AdoptionCat {self.name} ({self.uuid})>"
 
 
+def archived_linked_cats(cats):
+    """Chats archivés liés aux chats donnés (même annonce), du plus ancien au plus récent."""
+    known = {c.uuid for c in cats}
+    uuids = {u for c in cats for u in (c.linked_cats if isinstance(c.linked_cats, list) else [])} - known
+    if not uuids:
+        return []
+    return AdoptionCat.query.filter(AdoptionCat.uuid.in_(uuids), AdoptionCat.status == 'ARCHIVED') \
+        .order_by(AdoptionCat.id).all()
+
+
 class AdoptionCatPost(db.Model):
     """
     Publication d'une annonce sur un réseau social (Facebook, plus tard Instagram) : une ligne par chat et par
@@ -220,6 +224,9 @@ class AdoptionCatPost(db.Model):
     post_url = db.Column(db.String(255), nullable=True)
     last_error = db.Column(db.String(500), nullable=True)
     scheduled_at = db.Column(db.DateTime, nullable=True)  # mise en ligne programmée (heure locale), sinon NULL
+    # statut du chat lors de la dernière écriture du post : un écart avec son statut actuel (ex. chat passé
+    # en ARCHIVED depuis eraFA) signale un post à mettre à jour (commande flask sync-facebook)
+    synced_status = db.Column(db.Enum('UNDER_REVIEW', 'ACCEPTED', 'ARCHIVED', name='synced_status_enum'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

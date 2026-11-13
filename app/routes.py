@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from app import app, db, login_manager
 from app.photos import PhotoError, remove_files
-from app.models import AdoptionCat, AdoptionCatPost, User, build_groups, build_review_groups, photo_public_url, join_names_fr
+from app.models import AdoptionCat, AdoptionCatPost, User, archived_linked_cats, build_groups, build_review_groups, photo_public_url, join_names_fr
 from app import review_form, facebook, facebook_post
 from app.seed_data import SEED_CATS, COLOR_PHOTOS
 from app.helpers import slugify_name, build_contact_mailto, fold_text, MAIL_BODY_LINES
@@ -344,6 +344,8 @@ def group_form_page(group, mode):
         group=group,
         cats=review_form.editable_cats(group),
         published_cats=[c for c in group.cats if c.status == 'ACCEPTED'] if mode == 'review' else [],
+        # chats de l'annonce archivés pendant la validation (ex. adoptés, marqués depuis eraFA)
+        gone_cats=archived_linked_cats(group.cats) if mode == 'review' else [],
         common=common,
         own=own,
         errors=errors,
@@ -419,6 +421,7 @@ def facebook_preview_page(group, mode):
                     if mode == 'review':
                         for cat in review_form.editable_cats(group):
                             cat.status = 'ACCEPTED'
+                        facebook_post.mark_synced(cats)  # le post a été écrit pour des chats à adopter
                 db.session.commit()
                 if mode == 'review':
                     return redirect(url_for('admin_review_list', publie=group.main_cat.uuid, facebook=1,

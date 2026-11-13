@@ -74,8 +74,11 @@ def scheduled_at(cats):
     return max(dates) if dates and max(dates) > local_now().replace(tzinfo=None) else None
 
 
-def save_rows(cats, post_id=None, post_url=None, error=None, scheduled=None):
-    """Enregistre l'état Facebook des chats (crée ou met à jour leur ligne) ; sans commit."""
+def save_rows(cats, post_id=None, post_url=None, error=None, scheduled=None, synced=False):
+    """
+    Enregistre l'état Facebook des chats (crée ou met à jour leur ligne) ; sans commit.
+    synced : le post vient d'être écrit d'après le statut actuel des chats (voir mark_synced).
+    """
     existing = {r.cat_uuid: r for r in rows_of(cats)}
     for c in cats:
         row = existing.get(c.uuid) or AdoptionCatPost(cat_uuid=c.uuid, network=NETWORK)
@@ -83,7 +86,28 @@ def save_rows(cats, post_id=None, post_url=None, error=None, scheduled=None):
             row.post_id, row.post_url = post_id, post_url
             row.scheduled_at = scheduled.replace(tzinfo=None) if scheduled else None
         row.last_error = error[:500] if error else None
+        if synced:
+            row.synced_status = c.status
         db.session.add(row)
+
+
+def mark_synced(cats):
+    """
+    Enregistre le statut actuel des chats comme celui de leur post Facebook ; sans commit.
+    À appeler quand le statut change juste après l'écriture du post (validation : UNDER_REVIEW -> ACCEPTED).
+    """
+    for row in rows_of(cats):
+        if row.post_id:
+            row.synced_status = next(c.status for c in cats if c.uuid == row.cat_uuid)
+
+
+def pending_post_ids():
+    """Posts dont un chat a changé de statut depuis leur dernière écriture (ex. chat archivé depuis eraFA)."""
+    rows = db.session.query(AdoptionCatPost.post_id).join(AdoptionCat, AdoptionCat.uuid == AdoptionCatPost.cat_uuid) \
+        .filter(AdoptionCatPost.network == NETWORK, AdoptionCatPost.post_id.isnot(None),
+                db.or_(AdoptionCatPost.synced_status.is_(None), AdoptionCatPost.synced_status != AdoptionCat.status)) \
+        .distinct().all()
+    return sorted(r.post_id for r in rows)
 
 
 # --- Programmation
@@ -273,7 +297,7 @@ def publish(cats, scheduled=None):
         url = facebook.post_link(post_id)
     except facebook.FacebookError:
         url = None  # le post existe : le lien n'est qu'un plus
-    save_rows(cats, post_id=post_id, post_url=url, scheduled=scheduled)
+    save_rows(cats, post_id=post_id, post_url=url, scheduled=scheduled, synced=True)
     return post_id
 
 
@@ -293,7 +317,7 @@ def update(post_id):
                            "l'annonce n'y est plus rattachée.") from e
         save_rows(cats, error=str(e))
         raise
-    save_rows(cats)
+    save_rows(cats, synced=True)
 
 
 def sync_after_status_change(cats):
