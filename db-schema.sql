@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS `adoption_cat_posts` (
   `post_url` VARCHAR(255) DEFAULT NULL COMMENT 'Lien public du post',
   `last_error` VARCHAR(500) DEFAULT NULL COMMENT 'Dernière erreur du réseau (publication ou mise à jour)',
   `scheduled_at` DATETIME DEFAULT NULL COMMENT 'Mise en ligne programmée du post (heure de Paris) ; NULL : publié immédiatement',
+  `synced_status` ENUM('UNDER_REVIEW', 'ACCEPTED', 'ARCHIVED') DEFAULT NULL COMMENT 'Statut du chat lors de la dernière écriture du post sur le réseau',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 

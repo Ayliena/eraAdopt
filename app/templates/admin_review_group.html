@@ -64,6 +64,12 @@
   Les valeurs de {{ cats[0].name }} sont proposées ; à l'enregistrement, elles s'appliqueront à tous les chats.
 </div>
 {% endif %}
+{% if gone_cats %}
+<div class="admin-notice warning">
+  ⚠ Déjà adopté (ou parti) entre-temps : <strong>{{ gone_cats|map(attribute='name')|join(', ') }}</strong>.
+  Vérifiez que la description et les photos sont toujours justes avant de valider.
+</div>
+{% endif %}
 {% if published_cats %}
 <div class="admin-notice">
   Déjà publié et non modifié ici : {{ published_cats|map(attribute='name')|join(', ') }}.
