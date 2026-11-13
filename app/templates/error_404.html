@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex">
   <title>{{ 'Chat non disponible' if cat_link else 'Page introuvable' }} - ERA Adoptions</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=static_v('css/style.css')) }}">
+{% include '_head_icons.html' %}
 </head>
 <body>
 {% include '_user_bar.html' %}

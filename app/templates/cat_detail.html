@@ -8,6 +8,7 @@
   {% set names = cat.adoption_names_display %}
   <title>{{ names }} - {{ 'Adoption à plusieurs' if multi else "Fiche d'adoption" }} - ERA Adoptions</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=static_v('css/style.css')) }}">
+{% include '_head_icons.html' %}
 </head>
 <body>
 {% include '_user_bar.html' %}

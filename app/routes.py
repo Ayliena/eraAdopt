@@ -4,7 +4,7 @@ import shutil
 from datetime import datetime
 from functools import wraps
 from urllib.parse import quote
-from flask import render_template, jsonify, request, abort, redirect, url_for
+from flask import render_template, jsonify, request, abort, redirect, url_for, send_from_directory
 from flask_login import current_user
 from sqlalchemy import func
 from sqlalchemy.orm import aliased
@@ -219,6 +219,11 @@ def cat_detail(uuid):
 def page_not_found(error):
     """Page 404 aux couleurs du site ; message dédié pour une annonce (/chat/...) qui n'est plus disponible."""
     return render_template('error_404.html', cat_link=request.path.startswith('/chat/')), 404
+
+@app.route('/favicon.ico')
+def favicon():
+    """Icône demandée d'office par les navigateurs à la racine du site."""
+    return send_from_directory(os.path.join(app.root_path, 'static', 'img'), 'favicon.ico', max_age=86400)
 
 @app.route('/mentions-legales')
 def legal_notice():
