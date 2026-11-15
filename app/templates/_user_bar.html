@@ -1,0 +1,22 @@
+{% if current_user.is_authenticated %}
+  <div class="user-bar">
+    <div class="user-bar-container">
+      <span>👤 Connecté en tant que <a href="{{ config.ERAFA_URL }}/" class="user-bar-account" title="Aller sur le site des familles d'accueil"><strong>{{ current_user.display_name }}</strong></a>{% if current_user.is_adoption_admin %} <span class="user-bar-role">validation</span>{% endif %}</span>
+      <span class="user-bar-links">
+        {% if current_user.can_write_listings %}
+        <a href="{{ config.ERAFA_URL }}/annonce">Créer une annonce</a>
+        {% endif %}
+        {% if current_user.is_adoption_admin %}
+        <a href="{{ url_for('admin_listings') }}">Toutes les annonces</a>
+        <a href="{{ url_for('admin_review_list') }}">Annonces à valider{% if review_count %} <span class="user-bar-count">{{ review_count }}</span>{% endif %}</a>
+        <a href="{{ url_for('admin_facebook') }}" class="user-bar-icon" title="Santé du lien Facebook" aria-label="Santé du lien Facebook">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </a>
+        {% endif %}
+        <a href="{{ config.ERAFA_URL }}/logout/?next={{ request.url|urlencode }}">Se déconnecter</a>
+      </span>
+    </div>
+  </div>
+{% endif %}

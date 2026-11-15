@@ -1,0 +1,385 @@
+{% extends 'admin_base.html' %}
+
+{% block title %}{{ 'Modifier' if mode == 'edit' else 'Validation' }} : {{ group.names_display }}{% endblock %}
+
+{# Choix exclusif (oui / non / inconnu, sexe...) sous forme de boutons segmentés #}
+{% macro seg(name, choices, current, error=None) %}
+  <div class="seg-group">
+    {% for value, label in choices %}
+    <label class="seg-option">
+      <input type="radio" name="{{ name }}" value="{{ value }}" {{ 'checked' if current == value }}>
+      <span>{{ label }}</span>
+    </label>
+    {% endfor %}
+  </div>
+  {% if error %}<p class="field-error">{{ error }}</p>{% endif %}
+{% endmacro %}
+
+{% block content %}
+{% set editing = mode == 'edit' %}
+{% if editing %}
+<a href="{{ url_for('admin_listings') }}" class="admin-back">← Toutes les annonces</a>
+{% else %}
+<a href="{{ url_for('admin_review_list') }}" class="admin-back">← Annonces à valider</a>
+{% endif %}
+<div class="admin-title-row">
+  <h1>{{ 'Modifier : ' if editing }}{{ group.names_display }}</h1>
+  <span class="admin-count">{{ group.size }} chat{{ 's' if group.size > 1 else '' }}</span>
+</div>
+<p class="admin-subtitle">
+  Créée {% if group.creators_display %}par <strong>{{ group.creators_display }}</strong> {% endif %}le {{ group.created_at.strftime('%d/%m/%Y') }}.
+  {% if editing %}
+  Annonce publiée : les modifications enregistrées sont visibles immédiatement sur le site.
+  <a href="{{ url_for('cat_detail', uuid=group.main_cat.uuid) }}">Voir l'annonce</a>
+  {% else %}
+  Relisez et corrigez si besoin, puis validez pour publier l'annonce sur le site.
+  {% endif %}
+</p>
+
+{% if restored_notice %}
+<div class="admin-notice success">
+  ✓ Remis en ligne : <strong>{{ restored_notice }}</strong>, de nouveau visible sur le site.
+  {% if still_archived_notice %}Reste dans les archives : <strong>{{ still_archived_notice }}</strong>.{% endif %}<br>
+  Vérifiez l'annonce (âge, description, photos…) et enregistrez si quelque chose a changé.
+</div>
+{% endif %}
+{% if fb_gone %}
+<div class="admin-notice warning">La publication Facebook n'existe plus (supprimée sur la page) : l'annonce n'y est plus rattachée.</div>
+{% endif %}
+{% if fb_updated %}
+<div class="admin-notice success">✓ Publication Facebook {{ 'mise à jour' if fb_post_id else 'envoyée' }}.{% if fb_post_url %} <a href="{{ fb_post_url }}" target="_blank" rel="noopener">Voir la publication</a>{% endif %}</div>
+{% endif %}
+{% if saved %}
+<div class="admin-notice success">✓ Modifications enregistrées. {{ "L'annonce est à jour sur le site." if editing else "L'annonce n'est pas encore publiée." }}</div>
+{% endif %}
+{% if photo_errors %}
+<div class="admin-notice error">⚠ {{ photo_errors }} fichier{{ 's' if photo_errors > 1 }} photo n'{{ 'ont' if photo_errors > 1 else 'a' }} pas pu être supprimé{{ 's' if photo_errors > 1 }} du serveur (voir les logs). Les fiches sont bien à jour.</div>
+{% endif %}
+{% if errors %}
+<div class="admin-notice error">Certains champs sont à corriger (voir ci-dessous). Rien n'a été enregistré.</div>
+{% endif %}
+{% if differences %}
+<div class="admin-notice warning">
+  Les chats de cette annonce n'ont pas les mêmes valeurs pour : <strong>{{ differences|join(', ') }}</strong>.
+  Les valeurs de {{ cats[0].name }} sont proposées ; à l'enregistrement, elles s'appliqueront à tous les chats.
+</div>
+{% endif %}
+{% if gone_cats %}
+<div class="admin-notice warning">
+  ⚠ Déjà adopté (ou parti) entre-temps : <strong>{{ gone_cats|map(attribute='name')|join(', ') }}</strong>.
+  Vérifiez que la description et les photos sont toujours justes avant de valider.
+</div>
+{% endif %}
+{% if published_cats %}
+<div class="admin-notice">
+  Déjà publié et non modifié ici : {{ published_cats|map(attribute='name')|join(', ') }}.
+</div>
+{% endif %}
+
+<form method="POST" class="review-form" enctype="multipart/form-data" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <!-- Champs communs -->
+  <section class="info-card form-card">
+    <h2>{{ 'Commun aux ' ~ cats|length ~ ' chats' if cats|length > 1 else "L'annonce" }}</h2>
+    {% if cats|length > 1 %}
+    <p class="form-hint">Ces chats partagent la même annonce : entente, accès extérieur, description et photos sont communs.</p>
+    {% endif %}
+
+    {% if group.size > 1 %}
+    <div class="form-field">
+      <span class="form-label">Mode d'adoption <span class="form-label-hint">(à adopter ensemble, ou un par un, ex. une portée)</span></span>
+      {{ seg('adoption_mode', form.MODE_CHOICES, common.adoption_mode, errors.get('adoption_mode')) }}
+    </div>
+    {% endif %}
+
+    <div class="form-grid">
+      {% for field, label, choices in form.COMMON_CHOICES %}
+      <div class="form-field">
+        <span class="form-label">{{ label }}</span>
+        {{ seg(field, choices, common[field], errors.get(field)) }}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="form-field">
+      <label class="form-label" for="description">Description</label>
+      <textarea id="description" name="description" rows="7" class="form-input" required>{{ common.description }}</textarea>
+      {% if errors.description %}<p class="field-error">{{ errors.description }}</p>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <span class="form-label">Photos <span class="form-label-hint">({{ max_photos }} maximum)</span></span>
+      <input type="hidden" name="photo_main" id="photoMain" value="{{ available_photos[0] if available_photos }}">
+      <div class="photo-pick-grid" id="photoGrid">
+        {% for photo in available_photos %}
+        {% set marked = photo in common.photos_delete %}
+        <div class="photo-pick {{ 'is-deleted' if marked }} {{ 'is-main' if loop.first }}" data-photo="{{ photo }}">
+          <img src="{{ photo|photo_url }}" alt="Photo {{ loop.index }}" title="Définir comme photo principale">
+          <span class="photo-pick-main">Principale</span>
+          <button type="button" class="photo-pick-delete" title="Supprimer cette photo" aria-label="Supprimer la photo {{ loop.index }}">✕</button>
+          <div class="photo-pick-overlay">
+            <span>Sera supprimée</span>
+            <button type="button" class="photo-pick-undo">Annuler</button>
+          </div>
+          <input type="hidden" name="photos_delete" value="{{ photo }}" {{ 'disabled' if not marked }}>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="form-hint photo-pick-hint">
+        Cliquez sur une photo pour en faire la photo principale (affichée en premier sur le site).
+        Les photos marquées ✕ seront définitivement supprimées (fichier effacé du serveur) à l'enregistrement ;
+        d'ici là, « Annuler » permet de les garder.
+        Les photos ajoutées sont réduites automatiquement avant l'envoi, et les informations qu'elles contiennent
+        (dont la position GPS) sont supprimées.
+      </p>
+      <label class="form-label photo-add-label" for="photosNew">Ajouter des photos</label>
+      <input class="form-input" type="file" id="photosNew" name="photos_new" accept="image/jpeg,image/png,image/webp" multiple>
+      <p class="field-error" id="photoAddError"></p>
+      {% if errors.photos %}<p class="field-error">{{ errors.photos }}</p>{% endif %}
+      {% if new_photos_lost %}<p class="field-error">Les photos ajoutées sont à sélectionner de nouveau.</p>{% endif %}
+    </div>
+  </section>
+
+  <!-- Champs propres à chaque chat -->
+  {% for cat in cats %}
+  {% set p = 'c' ~ cat.id ~ '_' %}
+  {% set v = own[cat.id] %}
+  <section class="info-card form-card">
+    <h2>{{ ('Chat ' ~ loop.index ~ ' : ' ~ (v.name or cat.name)) if cats|length > 1 else 'Le chat' }}</h2>
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="form-label" for="{{ p }}name">Nom</label>
+        <input id="{{ p }}name" name="{{ p }}name" value="{{ v.name }}" maxlength="100" class="form-input">
+        {% if errors.get(p ~ 'name') %}<p class="field-error">{{ errors.get(p ~ 'name') }}</p>{% endif %}
+      </div>
+      <div class="form-field">
+        <span class="form-label">Sexe</span>
+        {{ seg(p ~ 'sex', form.SEX_CHOICES, v.sex, errors.get(p ~ 'sex')) }}
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="{{ p }}birthdate">Date de naissance <span class="form-label-hint">(estimée si inconnue)</span></label>
+        <input id="{{ p }}birthdate" name="{{ p }}birthdate" type="date" value="{{ v.birthdate }}" class="form-input" required>
+        {% if errors.get(p ~ 'birthdate') %}<p class="field-error">{{ errors.get(p ~ 'birthdate') }}</p>{% endif %}
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="{{ p }}breed">Race</label>
+        <input id="{{ p }}breed" name="{{ p }}breed" value="{{ v.breed }}" maxlength="100" class="form-input" placeholder="Européen">
+        {% if errors.get(p ~ 'breed') %}<p class="field-error">{{ errors.get(p ~ 'breed') }}</p>{% endif %}
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="{{ p }}color">Couleur <span class="form-label-hint">(reprise d'eraFA, ex. « Tigré, poil long »)</span></label>
+        <input id="{{ p }}color" name="{{ p }}color" value="{{ v.color }}" maxlength="64" class="form-input">
+        {% if errors.get(p ~ 'color') %}<p class="field-error">{{ errors.get(p ~ 'color') }}</p>{% endif %}
+      </div>
+      {% for field, label, choices in form.OWN_BOOL %}
+      <div class="form-field">
+        <span class="form-label">{{ label }}</span>
+        {{ seg(p ~ field, choices, v[field], errors.get(p ~ field)) }}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <!-- Facebook : publication à la validation, mise à jour du post existant, ou nouvel essai après un échec -->
+  {% if fb_enabled and (not editing or fb_post_id or fb_error) %}
+  <section class="info-card form-card fb-card">
+    <h2>Facebook</h2>
+    {% if fb_post_id %}
+    <p class="form-hint">
+      {% if fb_scheduled %}
+      Cette annonce a une publication programmée sur la page Facebook, mise en ligne le {{ fb_scheduled.strftime('%d/%m/%Y à %H:%M') }}
+      (visible dans le Planificateur de la page d'ici là).
+      {% else %}
+      Cette annonce a une publication sur la page Facebook.
+      {% if fb_post_url %}<a href="{{ fb_post_url }}" target="_blank" rel="noopener">Voir la publication</a>{% endif %}
+      {% endif %}
+    </p>
+    {% if fb_error %}
+    <div class="admin-notice warning">La dernière mise à jour de la publication a échoué : {{ fb_error }}
+      <a href="{{ url_for('admin_edit_facebook', uuid=group.main_cat.uuid) }}">Réessayer</a></div>
+    {% endif %}
+    <label class="fb-check">
+      <input type="checkbox" name="facebook" value="1" checked>
+      <span>Mettre à jour la publication Facebook <span class="form-label-hint">(aperçu du nouveau texte avant l'envoi ; les photos ne changent pas)</span></span>
+    </label>
+    {% elif fb_error and editing %}
+    <div class="admin-notice warning">La publication sur Facebook a échoué : {{ fb_error }}</div>
+    <a href="{{ url_for('admin_edit_facebook', uuid=group.main_cat.uuid) }}" class="btn-dialog-secondary btn-link">Réessayer de publier sur Facebook</a>
+    {% else %}
+    {% if fb_error %}
+    <div class="admin-notice warning">Une première tentative de publication sur Facebook a échoué : {{ fb_error }}</div>
+    {% endif %}
+    <label class="fb-check">
+      <input type="checkbox" name="facebook" value="1" id="facebookPublish">
+      <span>Publier aussi sur Facebook <span class="form-label-hint">(texte et photos de l'annonce ; aperçu avant l'envoi)</span></span>
+    </label>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <!-- Actions -->
+  <div class="form-actions">
+    {% if editing %}
+    <a href="{{ url_for('admin_listings') }}" class="btn-dialog-secondary btn-link">Annuler</a>
+    <button type="submit" name="action" value="save" class="btn-dialog-primary">Enregistrer</button>
+    {% else %}
+    <button type="submit" name="action" value="save" class="btn-dialog-secondary">Enregistrer</button>
+    <button type="submit" name="action" value="publish" class="btn-dialog-primary" id="publishButton"
+      data-confirm-icon="🐾" data-confirm-title="Publier l'annonce ?" data-confirm-ok="Publier"
+      data-confirm-message="{{ ('Les ' ~ cats|length ~ ' chats (' ~ group.names_display ~ ') seront visibles') if cats|length > 1 else (group.names_display ~ ' sera visible') }} sur le site des adoptions.">
+      Valider et publier
+    </button>
+    {% endif %}
+  </div>
+</form>
+
+{% if not editing %}
+<!-- Suppression de l'annonce en attente (hors du formulaire principal) -->
+<form method="POST" action="{{ url_for('admin_delete_listing', uuid=group.main_cat.uuid) }}" class="review-delete"
+  data-confirm-icon="🗑️" data-confirm-title="Supprimer cette annonce ?" data-confirm-ok="Supprimer" data-confirm-danger
+  data-confirm-message="L'annonce en attente de {{ cats|map(attribute='name')|join(', ') }} sera supprimée, avec ses fiches et ses photos. Cette action est irréversible.">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="btn-danger-link">Supprimer cette annonce en attente</button>
+</form>
+{% endif %}
+
+<script>
+  // « Publier aussi sur Facebook » coché : l'aperçu du post remplace la confirmation de publication
+  (() => {
+    const checkbox = document.getElementById('facebookPublish');
+    const button = document.getElementById('publishButton');
+    if (!checkbox || !button) return;
+    const label = button.textContent.trim();
+    const message = button.dataset.confirmMessage;
+    function refresh() {
+      button.textContent = checkbox.checked ? "Valider et voir l'aperçu Facebook" : label;
+      if (checkbox.checked) delete button.dataset.confirmMessage;
+      else button.dataset.confirmMessage = message;
+    }
+    checkbox.addEventListener('change', refresh);
+    refresh();
+  })();
+
+  (() => {
+    const MAX_PHOTOS = {{ max_photos }};
+    const MAX_SIDE = 1600;
+    const grid = document.getElementById('photoGrid');
+    const mainInput = document.getElementById('photoMain');
+    const input = document.getElementById('photosNew');
+    const errorBox = document.getElementById('photoAddError');
+    const submitButtons = document.querySelectorAll('.form-actions button[type="submit"]');
+    let added = [];      // photos ajoutées : [{file, url}], dans l'ordre d'envoi
+    let main = grid.querySelector('.photo-pick.is-main') || null;   // carte de la photo principale
+
+    // Photo principale : placée en premier, avec le badge "Principale".
+    // Photo existante : son nom de fichier ; photo ajoutée : 'new:<rang>'.
+    function setMain(card) {
+      main = card;
+      grid.querySelectorAll('.photo-pick').forEach((c) => c.classList.remove('is-main'));
+      if (!card) { mainInput.value = ''; return; }
+      card.classList.add('is-main');
+      grid.prepend(card);
+      mainInput.value = card.dataset.photo || 'new:' + added.indexOf(card.addedPhoto);
+    }
+
+    function firstKept() {
+      return grid.querySelector('.photo-pick:not(.is-deleted)');
+    }
+
+    function keptCount() {
+      return grid.querySelectorAll('.photo-pick[data-photo]:not(.is-deleted)').length;
+    }
+
+    grid.querySelectorAll('.photo-pick[data-photo]').forEach((card) => {
+      // Clic sur une photo (non marquée pour suppression) : elle devient la principale
+      card.querySelector('img').addEventListener('click', () => {
+        if (!card.classList.contains('is-deleted')) setMain(card);
+      });
+    });
+
+    // Marque / démarque une photo existante pour suppression (appliquée à l'enregistrement)
+    grid.querySelectorAll('.photo-pick-delete, .photo-pick-undo').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.photo-pick');
+        const marked = card.classList.toggle('is-deleted');
+        card.querySelector('input[name="photos_delete"]').disabled = !marked;
+        // La principale est marquée : la première photo conservée prend sa place
+        if (marked && card === main) {
+          setMain(firstKept());
+        } else if (!marked && !main) {
+          setMain(card);
+        }
+      });
+    });
+
+    // Photos ajoutées : réduites dans le navigateur avant l'envoi (plus grand côté 1600 px, JPEG), avec aperçu.
+    // Le serveur les traite de nouveau (Pillow) ; ceci ne sert qu'à alléger l'envoi.
+    if (typeof DataTransfer === 'undefined' || typeof createImageBitmap === 'undefined') return;  // ancien navigateur : envoi simple
+
+    async function shrink(file) {
+      try {
+        const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(bitmap.width * scale);
+        canvas.height = Math.round(bitmap.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+        if (!blob) return file;
+        return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+      } catch (e) {
+        return file;  // illisible par le navigateur : envoyée telle quelle, le serveur la vérifiera
+      }
+    }
+
+    // Recrée les cartes des photos ajoutées et le contenu du champ fichier
+    function sync() {
+      const dt = new DataTransfer();
+      added.forEach((a) => dt.items.add(a.file));
+      input.files = dt.files;
+
+      grid.querySelectorAll('.photo-pick.is-new').forEach((c) => c.remove());
+      const mainPhoto = main && main.addedPhoto;
+      let newMain = null;
+      added.forEach((a) => {
+        const card = document.createElement('div');
+        card.className = 'photo-pick is-new';
+        card.addedPhoto = a;
+        card.innerHTML = '<img alt="Nouvelle photo" title="Définir comme photo principale">'
+          + '<span class="photo-pick-main">Principale</span><span class="photo-pick-new">Nouvelle</span>'
+          + '<button type="button" class="photo-pick-delete" title="Retirer cette photo" aria-label="Retirer cette photo">✕</button>';
+        card.querySelector('img').src = a.url;
+        card.querySelector('img').addEventListener('click', () => setMain(card));
+        card.querySelector('button').addEventListener('click', () => {
+          URL.revokeObjectURL(a.url);
+          added.splice(added.indexOf(a), 1);
+          sync();
+        });
+        grid.appendChild(card);
+        if (a === mainPhoto) newMain = card;
+      });
+      if (main && main.addedPhoto) main = newMain;   // la principale était une photo ajoutée
+      setMain(main && !main.classList.contains('is-deleted') ? main : firstKept());
+    }
+
+    input.addEventListener('change', async () => {
+      const files = [...input.files].filter((f) => !added.some((a) => a.file === f));
+      const free = Math.max(0, MAX_PHOTOS - keptCount() - added.length);
+      errorBox.textContent = files.length > free
+        ? MAX_PHOTOS + ' photos maximum : les photos en trop ont été ignorées.' : '';
+      submitButtons.forEach((b) => { b.disabled = true; });
+      for (const file of files.slice(0, free)) {
+        const small = await shrink(file);
+        added.push({ file: small, url: URL.createObjectURL(small) });
+      }
+      submitButtons.forEach((b) => { b.disabled = false; });
+      sync();
+    });
+  })();
+</script>
+{% endblock %}

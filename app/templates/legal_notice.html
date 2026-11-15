@@ -1,0 +1,76 @@
+{% extends 'legal_base.html' %}
+
+{% block title %}Mentions légales{% endblock %}
+{% block updated %}4 octobre 2026{% endblock %}
+
+{% block content %}
+<section class="info-card legal-card">
+  <h2>Éditeur du site</h2>
+  <p>
+    <strong>E.R.A Éthique et Respect Animal</strong><br>
+    Association de droit local alsacien-mosellan, inscrite au registre des associations
+    du tribunal de Strasbourg, volume 92, folio 324.
+  </p>
+  <ul>
+    <li>Siège social : 1 rue des Zouaves, 67000 Strasbourg</li>
+    <li>SIREN : 808 946 883 &bull; SIRET : 808 946 883 00010</li>
+    <li>Contact : <a href="mailto:administration@association-era.org">administration@association-era.org</a></li>
+    <li>Site principal de l'association : <a href="https://www.association-era.org/">www.association-era.org</a></li>
+  </ul>
+</section>
+
+<section class="info-card legal-card">
+  <h2>Nous contacter</h2>
+  <ul>
+    <li>
+      <strong>Adoption :</strong> utilisez le bouton « Nous contacter » de l'annonce du chat qui vous intéresse,
+      ou écrivez-nous à <a href="mailto:adoptions@association-era.org">adoptions@association-era.org</a>.
+    </li>
+    <li>
+      <strong>Suivi post-adoption :</strong> pour toute question de santé ou en cas de souci d'adaptation,
+      écrivez-nous à <a href="mailto:postadoption@association-era.org">postadoption@association-era.org</a>.
+    </li>
+    <li>
+      <strong>Transfert I-Cad (identification) :</strong> un·e bénévole vous contactera dans les 3 à 6 mois suivant
+      l'adoption pour le transfert I-Cad. En cas d'urgence (ex. voyage à l'étranger) ou de délai inhabituel,
+      écrivez-nous à <a href="mailto:transferts@association-era.org">transferts@association-era.org</a>.
+    </li>
+    <li>
+      <strong>Autres demandes :</strong> <a href="mailto:administration@association-era.org">administration@association-era.org</a>.
+    </li>
+  </ul>
+</section>
+
+<section class="info-card legal-card">
+  <h2>Direction de la publication</h2>
+  <p>Laura Vix, présidence de l'association.</p>
+</section>
+
+<section class="info-card legal-card">
+  <h2>Hébergement</h2>
+  <p>
+    <strong>Alsace Réseau Neutre</strong> (association de droit local)<br>
+    16 route du Belfort, 67100 Strasbourg<br>
+    Téléphone : +33 3 67 10 41 39<br>
+    Site : <a href="https://arn-fai.net/">arn-fai.net</a>
+  </p>
+</section>
+
+<section class="info-card legal-card">
+  <h2>Propriété intellectuelle</h2>
+  <p>
+    Les textes et photographies présentés sur ce site appartiennent à l'association ERA
+    ou à ses bénévoles, qui en ont autorisé la diffusion. Toute reproduction, même partielle,
+    sans l'accord préalable de l'association est interdite.
+  </p>
+</section>
+
+<section class="info-card legal-card">
+  <h2>Données personnelles et cookies</h2>
+  <p>
+    Ce site ne dépose aucun cookie et n'utilise aucun outil de mesure d'audience.
+    Pour savoir comment sont traitées les informations que vous nous transmettez,
+    consultez notre <a href="{{ url_for('privacy') }}">politique de confidentialité</a>.
+  </p>
+</section>
+{% endblock %}
